@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>cnAgentOS - 后台管理系统</title>
+    <link rel="stylesheet" href="/static/dist/layui-v2.13.6/layui/css/layui.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 50%, #1e3c72 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Microsoft YaHei', sans-serif;
+        }
+        .login-container {
+            width: 100%;
+            max-width: 420px;
+            padding: 20px;
+        }
+        .login-box {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            padding: 40px 35px;
+            backdrop-filter: blur(10px);
+        }
+        .login-header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .login-header h1 {
+            font-size: 28px;
+            color: #1e3c72;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+        .login-header p {
+            color: #666;
+            font-size: 14px;
+        }
+        .login-form {
+            margin-top: 20px;
+        }
+        .layui-form-item {
+            margin-bottom: 20px;
+        }
+        .layui-input {
+            height: 48px;
+            font-size: 15px;
+            border-radius: 8px;
+            border: 1px solid #e8e8e8;
+            transition: all 0.3s ease;
+        }
+        .layui-input:focus {
+            border-color: #2a5298;
+            box-shadow: 0 0 0 3px rgba(42, 82, 152, 0.1);
+        }
+        .layui-btn-primary {
+            height: 48px;
+            font-size: 16px;
+            border-radius: 8px;
+            background: linear-gradient(135deg, #2a5298 0%, #1e3c72 100%);
+            border: none;
+            color: white;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+        .layui-btn-primary:hover {
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(42, 82, 152, 0.4);
+        }
+        .login-tips {
+            text-align: center;
+            margin-top: 15px;
+            color: #999;
+            font-size: 12px;
+        }
+        .login-tips span {
+            color: #2a5298;
+            font-weight: 500;
+        }
+        .error-msg {
+            display: none;
+            padding: 10px 15px;
+            background: #fff2f0;
+            border: 1px solid #ffccc7;
+            border-radius: 6px;
+            color: #ff4d4f;
+            font-size: 13px;
+            margin-bottom: 15px;
+            text-align: center;
+        }
+        .error-msg.show {
+            display: block;
+        }
+        @media (max-width: 480px) {
+            .login-box {
+                padding: 30px 25px;
+                margin: 15px;
+            }
+            .login-header h1 {
+                font-size: 24px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <div class="login-box">
+            <div class="login-header">
+                <h1>cnAgentOS</h1>
+                <p>智能瞭望与问数系统 - 后台管理</p>
+            </div>
+            
+            <div class="error-msg" id="errorMsg"></div>
+            
+            <form class="login-form" id="loginForm" method="post">
+                <input type="hidden" name="_xsrf" value="{{ xsrf_token }}">
+                
+                <div class="layui-form-item">
+                    <div class="layui-input-group">
+                        <span class="layui-input-group-addon">
+                            <i class="layui-icon layui-icon-user"></i>
+                        </span>
+                        <input type="text" name="username" id="username" 
+                               class="layui-input" placeholder="请输入用户名" 
+                               autocomplete="off">
+                    </div>
+                </div>
+                
+                <div class="layui-form-item">
+                    <div class="layui-input-group">
+                        <span class="layui-input-group-addon">
+                            <i class="layui-icon layui-icon-password"></i>
+                        </span>
+                        <input type="password" name="password" id="password" 
+                               class="layui-input" placeholder="请输入密码" 
+                               autocomplete="off">
+                    </div>
+                </div>
+                
+                <div class="layui-form-item">
+                    <button type="button" class="layui-btn layui-btn-primary layui-btn-fluid" 
+                            id="loginBtn">
+                        登 录
+                    </button>
+                </div>
+            </form>
+            
+            <div class="login-tips">
+                默认账号：<span>admin</span> 密码：<span>admin888</span>
+            </div>
+        </div>
+    </div>
+    
+    <script src="/static/dist/layui-v2.13.6/layui/layui.js"></script>
+    <script>
+        layui.use(['layer'], function() {
+            var layer = layui.layer;
+            
+            var loginBtn = document.getElementById('loginBtn');
+            var loginForm = document.getElementById('loginForm');
+            var errorMsg = document.getElementById('errorMsg');
+            
+            loginBtn.addEventListener('click', function() {
+                var username = document.getElementById('username').value.trim();
+                var password = document.getElementById('password').value;
+                
+                if (!username) {
+                    showError('请输入用户名');
+                    return;
+                }
+                if (!password) {
+                    showError('请输入密码');
+                    return;
+                }
+                
+                loginBtn.innerHTML = '登录中...';
+                loginBtn.disabled = true;
+                
+                var xhr = new XMLHttpRequest();
+                xhr.open('POST', '/auth/login', true);
+                xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+                
+                var formData = new FormData(loginForm);
+                var params = new URLSearchParams(formData).toString();
+                
+                xhr.onreadystatechange = function() {
+                    if (xhr.readyState === 4) {
+                        loginBtn.innerHTML = '登 录';
+                        loginBtn.disabled = false;
+                        
+                        if (xhr.status === 200) {
+                            try {
+                                var response = JSON.parse(xhr.responseText);
+                                if (response.code === 0) {
+                                    layer.msg(response.msg, {icon: 1}, function() {
+                                        window.location.href = response.url;
+                                    });
+                                } else {
+                                    showError(response.msg);
+                                }
+                            } catch (e) {
+                                showError('登录失败，请重试');
+                            }
+                        } else {
+                            try {
+                                var response = JSON.parse(xhr.responseText);
+                                showError(response.msg || '登录失败');
+                            } catch (e) {
+                                showError('登录失败，请重试');
+                            }
+                        }
+                    }
+                };
+                
+                xhr.send(params);
+            });
+            
+            function showError(msg) {
+                errorMsg.textContent = msg;
+                errorMsg.classList.add('show');
+                setTimeout(function() {
+                    errorMsg.classList.remove('show');
+                }, 3000);
+            }
+            
+            document.getElementById('password').addEventListener('keydown', function(e) {
+                if (e.key === 'Enter') {
+                    loginBtn.click();
+                }
+            });
+        });
+    </script>
+</body>
+</html>

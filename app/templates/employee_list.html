@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>数字员工管理 - cnAgentOS</title>
+    <link rel="stylesheet" href="/static/dist/layui-v2.13.6/layui/css/layui.css">
+    <style>
+        .employee-card { padding: 15px; background: #fff; border-radius: 4px; margin-bottom: 10px; }
+        .employee-avatar { font-size: 32px; margin-right: 15px; }
+        .employee-info { display: inline-block; vertical-align: middle; }
+        .employee-name { font-size: 16px; font-weight: bold; color: #333; }
+        .employee-alias { color: #1E9FFF; margin-left: 10px; }
+        .employee-category { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 12px; margin-left: 10px; }
+        .category-ai { background: #FF5722; color: #fff; }
+        .category-normal { background: #009688; color: #fff; }
+        .layui-table-cell { height: auto; line-height: 28px; }
+    </style>
+</head>
+<body class="layui-layout-body">
+<div class="layui-layout layui-layout-admin">
+    <div class="layui-header">
+        <div class="layui-logo"><i class="layui-icon layui-icon-laptop"></i> cnAgentOS 管理系统</div>
+        <ul class="layui-nav layui-layout-right">
+            <li class="layui-nav-item"><a href="javascript:void(0)" id="refreshBtn"><i class="layui-icon layui-icon-refresh"></i> 刷新</a></li>
+            <li class="layui-nav-item"><a href="javascript:void(0)" id="fullscreenBtn"><i class="layui-icon layui-icon-screen-full"></i> 全屏</a></li>
+            <li class="layui-nav-item"><a href="javascript:void(0)" id="userMenu"><span class="user-avatar">{{ current_user[:1].upper() }}</span> {{ current_user }}</a></li>
+            <li class="layui-nav-item"><a href="/auth/logout" id="logoutBtn"><i class="layui-icon layui-icon-power"></i> 退出</a></li>
+        </ul>
+    </div>
+    
+    <div class="layui-side layui-bg-black">
+        <div class="layui-side-scroll">
+            <ul class="layui-nav layui-nav-tree" lay-filter="sideMenu">
+                <li class="layui-nav-item">
+                    <a href="javascript:void(0)"><i class="layui-icon layui-icon-dashboard"></i> 系统管理</a>
+                    <dl class="layui-nav-child">
+                        <dd><a href="/admin/users">用户管理</a></dd>
+                        <dd><a href="/admin/roles">角色管理</a></dd>
+                        <dd><a href="/admin/permissions">权限管理</a></dd>
+                    </dl>
+                </li>
+                <li class="layui-nav-item">
+                    <a href="javascript:void(0)"><i class="layui-icon layui-icon-app"></i> 功能管理</a>
+                    <dl class="layui-nav-child">
+                        <dd><a href="/admin/functions">功能列表</a></dd>
+                        <dd><a href="/admin/modules">模块管理</a></dd>
+                    </dl>
+                </li>
+                <li class="layui-nav-item">
+                    <a href="javascript:void(0)"><i class="layui-icon layui-icon-engine"></i> 模型引擎</a>
+                    <dl class="layui-nav-child">
+                        <dd><a href="/admin/models">模型管理</a></dd>
+                    </dl>
+                </li>
+                <li class="layui-nav-item layui-nav-itemed">
+                    <a href="javascript:void(0)"><i class="layui-icon layui-icon-user"></i> 数字员工</a>
+                    <dl class="layui-nav-child">
+                        <dd class="layui-this"><a href="/admin/employees">员工管理</a></dd>
+                    </dl>
+                </li>
+                <li class="layui-nav-item">
+                    <a href="javascript:void(0)"><i class="layui-icon layui-icon-search"></i> 瞭望管理</a>
+                    <dl class="layui-nav-child">
+                        <dd><a href="/admin/scout">瞭望源管理</a></dd>
+                        <dd><a href="/admin/scout/collect">数据采集</a></dd>
+                        <dd><a href="/admin/warehouse">数据仓库</a></dd>
+                    </dl>
+                </li>
+                <li class="layui-nav-item">
+                    <a href="javascript:void(0)"><i class="layui-icon layui-icon-link"></i> 接口管理</a>
+                    <dl class="layui-nav-child">
+                        <dd><a href="/admin/interfaces">接口列表</a></dd>
+                    </dl>
+                </li>
+            </ul>
+        </div>
+    </div>
+    
+    <div class="layui-body">
+        <div class="page-header">
+            <h2 class="page-title">数字员工管理</h2>
+            <button id="addBtn" class="layui-btn"><i class="layui-icon layui-icon-add-1"></i> 添加员工</button>
+        </div>
+        <input type="hidden" id="xsrf_token" value="{{ xsrf_token }}">
+        <table id="employeeTable" class="layui-table" lay-filter="employeeTable"></table>
+    </div>
+</div>
+
+<script type="text/html" id="toolbarTpl">
+    <div class="layui-btn-container">
+        <button class="layui-btn layui-btn-sm" lay-event="batchDelete"><i class="layui-icon layui-icon-delete"></i>批量删除</button>
+    </div>
+</script>
+
+<script type="text/html" id="avatarTpl">
+    <span style="font-size: 24px;">&#123;&#123; d.avatar &#125;&#125;</span>
+</script>
+
+<script type="text/html" id="categoryTpl">
+    &#123;&#123;# if(d.category === 'AI'){ &#125;&#125;
+        <span class="layui-badge layui-bg-orange">AI</span>
+    &#123;&#123;# } else { &#125;&#125;
+        <span class="layui-badge layui-bg-green">普通</span>
+    &#123;&#123;# } &#125;&#125;
+</script><script type="text/html" id="statusTpl">
+    &#123;&#123;# if(d.enabled == 1){ &#125;&#125;
+        <span class="layui-badge layui-bg-green">启用</span>
+    &#123;&#123;# } else { &#125;&#125;
+        <span class="layui-badge layui-bg-gray">禁用</span>
+    &#123;&#123;# } &#125;&#125;
+</script>
+
+<script type="text/html" id="operateTpl">
+    <a class="layui-btn layui-btn-xs" lay-event="chat"><i class="layui-icon layui-icon-dialogue"></i>对话</a>
+    <a class="layui-btn layui-btn-normal layui-btn-xs" lay-event="edit"><i class="layui-icon layui-icon-edit"></i>编辑</a>
+    <a class="layui-btn layui-btn-danger layui-btn-xs" lay-event="delete"><i class="layui-icon layui-icon-delete"></i>删除</a>
+</script>
+
+<script src="/static/dist/layui-v2.13.6/layui/layui.js"></script>
+<script>
+layui.use(['table', 'layer', 'form'], function(){
+    var table = layui.table;
+    var layer = layui.layer;
+    var form = layui.form;
+    var xsrfToken = document.getElementById('xsrf_token').value;
+    
+    var tableIns = table.render({
+        elem: '#employeeTable',
+        url: '/api/employees',
+        page: true,
+        limit: 20,
+        toolbar: '#toolbarTpl',
+        defaultToolbar: ['filter', 'exports', 'print'],
+        cols: [[
+            {type: 'checkbox', fixed: 'left'},
+            {field: 'id', title: 'ID', width: 60, sort: true},
+            {field: 'avatar', title: '头像', width: 60, templet: '#avatarTpl'},
+            {field: 'name', title: '名称', width: 120},
+            {field: 'alias', title: '别名', width: 100, templet: function(d){
+                return '<span style="color:#1E9FFF">@' + d.alias + '</span>';
+            }},
+            {field: 'category', title: '类别', width: 80, templet: '#categoryTpl'},
+            {field: 'description', title: '说明', minWidth: 200},
+            {field: 'model_name', title: '关联模型', width: 120},
+            {field: 'api_name', title: '关联接口', width: 120},
+            {field: 'enabled', title: '状态', width: 80, templet: '#statusTpl'},
+            {field: 'create_at', title: '创建时间', width: 160},
+            {fixed: 'right', title: '操作', toolbar: '#operateTpl', width: 200}
+        ]],
+        parseData: function(res){
+            return {
+                "code": res.code,
+                "msg": res.msg,
+                "count": res.count,
+                "data": res.data
+            };
+        }
+    });
+    
+    table.on('toolbar(employeeTable)', function(obj){
+        var checkStatus = table.checkStatus(obj.config.id);
+        var data = checkStatus.data;
+        
+        if(obj.event === 'batchDelete'){
+            if(data.length === 0){
+                layer.msg('请选择要删除的数据');
+                return;
+            }
+            var ids = data.map(function(item){ return item.id; });
+            layer.confirm('确定删除选中的 ' + ids.length + ' 条数据吗？', function(index){
+                var xhr = new XMLHttpRequest();
+                xhr.open('POST', '/api/employees', true);
+                xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+                xhr.onreadystatechange = function(){
+                    if(xhr.readyState === 4){
+                        var res = JSON.parse(xhr.responseText);
+                        layer.msg(res.msg);
+                        if(res.code === 0){
+                            tableIns.reload();
+                        }
+                    }
+                };
+                xhr.send('action=batchDelete&ids=' + ids.join(',') + '&_xsrf=' + xsrfToken);
+                layer.close(index);
+            });
+        }
+    });
+    
+    table.on('tool(employeeTable)', function(obj){
+        var data = obj.data;
+        
+        if(obj.event === 'chat'){
+            window.location.href = '/admin/employees/chat?alias=' + encodeURIComponent(data.alias);
+        }
+        
+        if(obj.event === 'edit'){
+            layer.open({
+                type: 1,
+                title: '编辑数字员工',
+                area: ['600px', '500px'],
+                content: `
+                    <form class="layui-form" style="padding: 20px;" lay-filter="editForm">
+                        <input type="hidden" name="id" value="${data.id}">
+                        <div class="layui-form-item">
+                            <label class="layui-form-label">名称</label>
+                            <div class="layui-input-block">
+                                <input type="text" name="name" value="${data.name}" class="layui-input" required>
+                            </div>
+                        </div>
+                        <div class="layui-form-item">
+                            <label class="layui-form-label">别名</label>
+                            <div class="layui-input-block">
+                                <input type="text" name="alias" value="${data.alias}" class="layui-input" required>
+                                <div class="layui-form-mid layui-word-aux">用户通过 @别名 调用该员工</div>
+                            </div>
+                        </div>
+                        <div class="layui-form-item">
+                            <label class="layui-form-label">类别</label>
+                            <div class="layui-input-block">
+                                <select name="category" lay-filter="categorySelect">
+                                    <option value="AI" ${data.category === 'AI' ? 'selected' : ''}>AI（大模型）</option>
+                                    <option value="普通" ${data.category === '普通' ? 'selected' : ''}>普通（API接口）</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="layui-form-item">
+                            <label class="layui-form-label">头像</label>
+                            <div class="layui-input-block">
+                                <input type="text" name="avatar" value="${data.avatar || '🤖'}" class="layui-input">
+                            </div>
+                        </div>
+                        <div class="layui-form-item">
+                            <label class="layui-form-label">说明</label>
+                            <div class="layui-input-block">
+                                <textarea name="description" class="layui-textarea">${data.description || ''}</textarea>
+                            </div>
+                        </div>
+                        <div class="layui-form-item" id="promptItem" style="display:${data.category === 'AI' ? 'block' : 'none'}">
+                            <label class="layui-form-label">提示词</label>
+                            <div class="layui-input-block">
+                                <textarea name="prompt" class="layui-textarea" rows="4">${data.prompt || ''}</textarea>
+                            </div>
+                        </div>
+                        <div class="layui-form-item" id="modelItem" style="display:${data.category === 'AI' ? 'block' : 'none'}">
+                            <label class="layui-form-label">关联模型</label>
+                            <div class="layui-input-block">
+                                <select name="model_id">
+                                    <option value="">使用默认模型</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="layui-form-item" id="apiItem" style="display:${data.category === '普通' ? 'block' : 'none'}">
+                            <label class="layui-form-label">关联接口</label>
+                            <div class="layui-input-block">
+                                <select name="api_interface_id">
+                                    <option value="">请选择接口</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="layui-form-item">
+                            <label class="layui-form-label">欢迎语</label>
+                            <div class="layui-input-block">
+                                <input type="text" name="welcome_msg" value="${data.welcome_msg || ''}" class="layui-input">
+                            </div>
+                        </div>
+                        <div class="layui-form-item">
+                            <label class="layui-form-label">状态</label>
+                            <div class="layui-input-block">
+                                <input type="checkbox" name="enabled" lay-skin="switch" lay-text="启用|禁用" ${data.enabled == 1 ? 'checked' : ''}>
+                            </div>
+                        </div>
+                        <div class="layui-form-item">
+                            <div class="layui-input-block">
+                                <button class="layui-btn" lay-submit lay-filter="submitEdit">保存</button>
+                                <button type="reset" class="layui-btn layui-btn-primary">重置</button>
+                            </div>
+                        </div>
+                    </form>
+                `,
+                success: function(layero, index){
+                    form.render();
+                    
+                    var modelSelect = layero.find('select[name="model_id"]')[0];
+                    loadModels(modelSelect, data.model_id || '');
+                    
+                    form.on('select(categorySelect)', function(val){
+                        if(val.value === 'AI'){
+                            document.getElementById('promptItem').style.display = 'block';
+                            document.getElementById('modelItem').style.display = 'block';
+                            document.getElementById('apiItem').style.display = 'none';
+                        } else {
+                            document.getElementById('promptItem').style.display = 'none';
+                            document.getElementById('modelItem').style.display = 'none';
+                            document.getElementById('apiItem').style.display = 'block';
+                        }
+                    });
+                    
+                    form.on('submit(submitEdit)', function(formData){
+                        var xhr = new XMLHttpRequest();
+                        xhr.open('POST', '/api/employees', true);
+                        xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+                        xhr.onreadystatechange = function(){
+                            if(xhr.readyState === 4){
+                                var res = JSON.parse(xhr.responseText);
+                                layer.msg(res.msg);
+                                if(res.code === 0){
+                                    layer.close(index);
+                                    tableIns.reload();
+                                }
+                            }
+                        };
+                        var params = 'action=edit&id=' + formData.field.id;
+                        params += '&name=' + encodeURIComponent(formData.field.name);
+                        params += '&alias=' + encodeURIComponent(formData.field.alias);
+                        params += '&category=' + formData.field.category;
+                        params += '&description=' + encodeURIComponent(formData.field.description || '');
+                        params += '&prompt=' + encodeURIComponent(formData.field.prompt || '');
+                        params += '&model_id=' + (formData.field.model_id || '');
+                        params += '&api_interface_id=' + (formData.field.api_interface_id || '');
+                        params += '&avatar=' + encodeURIComponent(formData.field.avatar || '🤖');
+                        params += '&welcome_msg=' + encodeURIComponent(formData.field.welcome_msg || '');
+                        params += '&enabled=' + (formData.field.enabled === 'on' ? 'true' : 'false');
+                        params += '&_xsrf=' + xsrfToken;
+                        xhr.send(params);
+                        return false;
+                    });
+                }
+            });
+        }
+        
+        if(obj.event === 'delete'){
+            layer.confirm('确定删除该数字员工吗？', function(index){
+                var xhr = new XMLHttpRequest();
+                xhr.open('POST', '/api/employees', true);
+                xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+                xhr.onreadystatechange = function(){
+                    if(xhr.readyState === 4){
+                        var res = JSON.parse(xhr.responseText);
+                        layer.msg(res.msg);
+                        if(res.code === 0){
+                            tableIns.reload();
+                        }
+                    }
+                };
+                xhr.send('action=delete&id=' + data.id + '&_xsrf=' + xsrfToken);
+                layer.close(index);
+            });
+        }
+    });
+    
+    document.getElementById('addBtn').onclick = function(){
+        layer.open({
+            type: 1,
+            title: '添加数字员工',
+            area: ['600px', '500px'],
+            content: `
+                <form class="layui-form" style="padding: 20px;" lay-filter="addForm">
+                    <div class="layui-form-item">
+                        <label class="layui-form-label">名称</label>
+                        <div class="layui-input-block">
+                            <input type="text" name="name" class="layui-input" placeholder="请输入名称" required>
+                        </div>
+                    </div>
+                    <div class="layui-form-item">
+                        <label class="layui-form-label">别名</label>
+                        <div class="layui-input-block">
+                            <input type="text" name="alias" class="layui-input" placeholder="请输入别名" required>
+                            <div class="layui-form-mid layui-word-aux">用户通过 @别名 调用该员工</div>
+                        </div>
+                    </div>
+                    <div class="layui-form-item">
+                        <label class="layui-form-label">类别</label>
+                        <div class="layui-input-block">
+                            <select name="category" lay-filter="categorySelect">
+                                <option value="AI">AI（大模型）</option>
+                                <option value="普通">普通（API接口）</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="layui-form-item">
+                        <label class="layui-form-label">头像</label>
+                        <div class="layui-input-block">
+                            <input type="text" name="avatar" value="🤖" class="layui-input" placeholder="输入emoji表情">
+                        </div>
+                    </div>
+                    <div class="layui-form-item">
+                        <label class="layui-form-label">说明</label>
+                        <div class="layui-input-block">
+                            <textarea name="description" class="layui-textarea" placeholder="请输入说明"></textarea>
+                        </div>
+                    </div>
+                    <div class="layui-form-item" id="promptItem">
+                        <label class="layui-form-label">提示词</label>
+                        <div class="layui-input-block">
+                            <textarea name="prompt" class="layui-textarea" rows="4" placeholder="AI类员工需要配置提示词"></textarea>
+                        </div>
+                    </div>
+                    <div class="layui-form-item" id="modelItem">
+                        <label class="layui-form-label">关联模型</label>
+                        <div class="layui-input-block">
+                            <select name="model_id">
+                                <option value="">使用默认模型</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="layui-form-item" id="apiItem" style="display:none">
+                        <label class="layui-form-label">关联接口</label>
+                        <div class="layui-input-block">
+                            <select name="api_interface_id">
+                                <option value="">请选择接口</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="layui-form-item">
+                        <label class="layui-form-label">欢迎语</label>
+                        <div class="layui-input-block">
+                            <input type="text" name="welcome_msg" class="layui-input" placeholder="员工欢迎语">
+                        </div>
+                    </div>
+                    <div class="layui-form-item">
+                        <label class="layui-form-label">状态</label>
+                        <div class="layui-input-block">
+                            <input type="checkbox" name="enabled" lay-skin="switch" lay-text="启用|禁用" checked>
+                        </div>
+                    </div>
+                    <div class="layui-form-item">
+                        <div class="layui-input-block">
+                            <button class="layui-btn" lay-submit lay-filter="submitAdd">添加</button>
+                            <button type="reset" class="layui-btn layui-btn-primary">重置</button>
+                        </div>
+                    </div>
+                </form>
+            `,
+            success: function(layero, index){
+                form.render();
+                
+                var modelSelect = layero.find('select[name="model_id"]')[0];
+                loadModels(modelSelect, '');
+                
+                form.on('select(categorySelect)', function(val){
+                    if(val.value === 'AI'){
+                        document.getElementById('promptItem').style.display = 'block';
+                        document.getElementById('modelItem').style.display = 'block';
+                        document.getElementById('apiItem').style.display = 'none';
+                    } else {
+                        document.getElementById('promptItem').style.display = 'none';
+                        document.getElementById('modelItem').style.display = 'none';
+                        document.getElementById('apiItem').style.display = 'block';
+                    }
+                });
+                
+                form.on('submit(submitAdd)', function(formData){
+                    var xhr = new XMLHttpRequest();
+                    xhr.open('POST', '/api/employees', true);
+                    xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+                    xhr.onreadystatechange = function(){
+                        if(xhr.readyState === 4){
+                            var res = JSON.parse(xhr.responseText);
+                            layer.msg(res.msg);
+                            if(res.code === 0){
+                                layer.close(index);
+                                tableIns.reload();
+                            }
+                        }
+                    };
+                    var params = 'action=add';
+                    params += '&name=' + encodeURIComponent(formData.field.name);
+                    params += '&alias=' + encodeURIComponent(formData.field.alias);
+                    params += '&category=' + formData.field.category;
+                    params += '&description=' + encodeURIComponent(formData.field.description || '');
+                    params += '&prompt=' + encodeURIComponent(formData.field.prompt || '');
+                    params += '&model_id=' + (formData.field.model_id || '');
+                    params += '&api_interface_id=' + (formData.field.api_interface_id || '');
+                    params += '&avatar=' + encodeURIComponent(formData.field.avatar || '🤖');
+                    params += '&welcome_msg=' + encodeURIComponent(formData.field.welcome_msg || '');
+                    params += '&enabled=' + (formData.field.enabled === 'on' ? 'true' : 'false');
+                    params += '&_xsrf=' + xsrfToken;
+                    xhr.send(params);
+                    return false;
+                });
+            }
+        });
+    };
+    
+    document.getElementById('refreshBtn').onclick = function(){
+        tableIns.reload();
+    };
+    
+    document.getElementById('fullscreenBtn').onclick = function(){
+        var doc = document;
+        var docEl = doc.documentElement;
+        var requestFullScreen = docEl.requestFullscreen || docEl.mozRequestFullScreen || docEl.webkitRequestFullScreen || docEl.msRequestFullscreen;
+        var cancelFullScreen = doc.exitFullscreen || doc.mozCancelFullScreen || doc.webkitExitFullscreen || doc.msExitFullscreen;
+        
+        if(!doc.fullscreenElement && !doc.mozFullScreenElement && !doc.webkitFullscreenElement && !doc.msFullscreenElement){
+            requestFullScreen.call(docEl);
+        } else {
+            cancelFullScreen.call(doc);
+        }
+    };
+    
+    function loadModels(selectElement, selectedId) {
+        var xhr = new XMLHttpRequest();
+        xhr.open('GET', '/api/models/options', true);
+        xhr.onreadystatechange = function() {
+            if(xhr.readyState === 4 && xhr.status === 200) {
+                var res = JSON.parse(xhr.responseText);
+                if(res.code === 0) {
+                    selectElement.innerHTML = '<option value="">使用默认模型</option>';
+                    res.data.forEach(function(item) {
+                        var option = document.createElement('option');
+                        option.value = item.id;
+                        option.textContent = item.name;
+                        if(item.id == selectedId) {
+                            option.selected = true;
+                        }
+                        selectElement.appendChild(option);
+                    });
+                    form.render('select');
+                }
+            }
+        };
+        xhr.send();
+    }
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>瞭望管理 - cnAgentOS管理系统</title>
+    <link rel="stylesheet" href="/static/dist/layui-v2.13.6/layui/css/layui.css">
+    <style>
+        body { margin: 0; padding: 0; background: #f5f5f5; }
+        .layui-layout-admin .layui-header { background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); box-shadow: 0 2px 10px rgba(0,0,0,0.15); }
+        .layui-header .layui-logo { color: white; font-size: 18px; font-weight: 600; padding: 0 30px; }
+        .layui-nav-item a { color: white !important; }
+        .layui-nav-item:hover { background: rgba(255,255,255,0.1); }
+        .layui-side { background: #2f4050; width: 200px; }
+        .layui-side-scroll { width: 220px; }
+        .layui-nav-tree .layui-nav-item a { color: #a7b1c2; height: 45px; line-height: 45px; padding-left: 25px; }
+        .layui-nav-tree .layui-nav-item a:hover { color: white; background: #293846; }
+        .layui-nav-tree .layui-nav-item.layui-nav-itemed>a { background: #1ab394 !important; color: white; }
+        .layui-body { background: #f3f3f4; left: 200px; padding: 20px; }
+        .user-avatar { width: 32px; height: 32px; border-radius: 50%; background: rgba(255,255,255,0.2); display: inline-block; line-height: 32px; text-align: center; margin-right: 8px; font-size: 14px; }
+        .page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .page-title { font-size: 20px; font-weight: 600; color: #676a6c; }
+        .layui-table { background: white; border-radius: 8px; box-shadow: 0 2px 12px 0 rgba(0,0,0,0.08); }
+        .status-badge { padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 500; }
+        .status-badge.enabled { background: rgba(46, 213, 115, 0.2); color: #2ed573; }
+        .status-badge.disabled { background: rgba(255, 107, 107, 0.2); color: #ff6b6b; }
+        .keyword-input { width: 200px; padding: 8px 12px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: #333; font-size: 13px; }
+        .keyword-input:focus { outline: none; border-color: #00d4ff; }
+        .code-preview { background: #1a1a2e; border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 15px; overflow-x: auto; max-height: 400px; overflow-y: auto; }
+        .code-preview pre { margin: 0; color: #8892b0; font-family: 'Consolas', monospace; font-size: 12px; white-space: pre-wrap; word-break: break-all; }
+    </style>
+</head>
+<body class="layui-layout-body">
+    <div class="layui-layout layui-layout-admin">
+        <!-- 头部 -->
+        <div class="layui-header">
+            <div class="layui-logo"><i class="layui-icon layui-icon-laptop"></i> cnAgentOS 管理系统</div>
+            <ul class="layui-nav layui-layout-right">
+                <li class="layui-nav-item"><a href="javascript:void(0)" id="refreshBtn"><i class="layui-icon layui-icon-refresh"></i> 刷新</a></li>
+                <li class="layui-nav-item"><a href="javascript:void(0)" id="fullscreenBtn"><i class="layui-icon layui-icon-screen-full"></i> 全屏</a></li>
+                <li class="layui-nav-item"><a href="javascript:void(0)" id="userMenu"><span class="user-avatar">{{ current_user[:1].upper() }}</span> {{ current_user }}</a></li>
+                <li class="layui-nav-item"><a href="/auth/logout" id="logoutBtn"><i class="layui-icon layui-icon-power"></i> 退出</a></li>
+            </ul>
+        </div>
+        
+        <!-- 侧边栏 -->
+        <div class="layui-side layui-bg-black">
+            <div class="layui-side-scroll">
+                <ul class="layui-nav layui-nav-tree" lay-filter="sideMenu">
+                    <li class="layui-nav-item">
+                        <a href="javascript:void(0)"><i class="layui-icon layui-icon-dashboard"></i> 系统管理</a>
+                        <dl class="layui-nav-child">
+                            <dd><a href="/admin/users">用户管理</a></dd>
+                            <dd><a href="/admin/roles">角色管理</a></dd>
+                            <dd><a href="/admin/permissions">权限管理</a></dd>
+                        </dl>
+                    </li>
+                    <li class="layui-nav-item">
+                        <a href="javascript:void(0)"><i class="layui-icon layui-icon-set"></i> 功能管理</a>
+                        <dl class="layui-nav-child">
+                            <dd><a href="/admin/functions">功能列表</a></dd>
+                            <dd><a href="/admin/modules">模块管理</a></dd>
+                        </dl>
+                    </li>
+                    <li class="layui-nav-item"><a href="javascript:void(0)"><i class="layui-icon layui-icon-server"></i> 模型引擎</a>
+                        <dl class="layui-nav-child"><dd><a href="/admin/models">模型管理</a></dd></dl>
+                    </li>
+                    <li class="layui-nav-item"><a href="javascript:void(0)"><i class="layui-icon layui-icon-user"></i> 数字员工</a>
+                        <dl class="layui-nav-child">
+                            <dd><a href="/admin/employees">员工管理</a></dd>
+                        </dl>
+                    </li>
+                    <li class="layui-nav-item layui-nav-itemed">
+                        <a href="javascript:void(0)"><i class="layui-icon layui-icon-search"></i> 瞭望管理</a>
+                        <dl class="layui-nav-child">
+                            <dd><a href="/admin/scout">瞭望源管理</a></dd>
+                            <dd><a href="/admin/scout/collect">数据采集</a></dd>
+                            <dd><a href="/admin/warehouse">数据仓库</a></dd>
+                        </dl>
+                    </li>
+                    <li class="layui-nav-item">
+                        <a href="javascript:void(0)"><i class="layui-icon layui-icon-link"></i> 接口管理</a>
+                        <dl class="layui-nav-child">
+                            <dd><a href="/admin/interfaces">接口列表</a></dd>
+                        </dl>
+                    </li>
+                    <li class="layui-nav-item"><a href="/admin"><i class="layui-icon layui-icon-home"></i> 返回首页</a></li>
+                </ul>
+            </div>
+        </div>
+        
+        <!-- 主体内容 -->
+        <div class="layui-body">
+            <div class="page-header">
+                <h2 class="page-title">瞭望源管理</h2>
+                <div class="search-bar">
+                    <button type="button" class="layui-btn" id="addBtn">
+                        <i class="layui-icon layui-icon-add-1"></i> 新增数据源
+                    </button>
+                    <button type="button" class="layui-btn layui-btn-normal" id="batchCollectBtn" style="display: none;">
+                        <i class="layui-icon layui-icon-refresh"></i> 批量采集
+                    </button>
+                </div>
+            </div>
+            <input type="hidden" id="xsrf_token" value="{{ xsrf_token }}">
+            <table id="scoutTable" class="layui-table"></table>
+        </div>
+    </div>
+
+    <script type="text/html" id="statusTpl">
+        <span class="status-badge {{ layui_status_template }}">{{ layui_status_text_template }}</span>
+    </script>
+
+    <script type="text/html" id="barDemo">
+        <a class="layui-btn layui-btn-xs" lay-event="toggle">{{ layui_toggle_template }}</a>
+        <a class="layui-btn layui-btn-xs" lay-event="edit">编辑</a>
+        <a class="layui-btn layui-btn-xs" lay-event="collect">采集</a>
+        <a class="layui-btn layui-btn-danger layui-btn-xs" lay-event="del">删除</a>
+    </script>
+
+    <!-- 添加/编辑数据源弹窗 -->
+    <div style="display: none;" id="sourceModal">
+        <form class="layui-form" id="sourceForm" style="padding: 20px;">
+            <input type="hidden" name="id" id="formId">
+            <div class="layui-form-item">
+                <label class="layui-form-label">数据源名称</label>
+                <div class="layui-input-block">
+                    <input type="text" name="name" id="formName" lay-verify="required" 
+                           placeholder="请输入数据源名称" class="layui-input">
+                </div>
+            </div>
+            <div class="layui-form-item">
+                <label class="layui-form-label">URL模式</label>
+                <div class="layui-input-block">
+                    <input type="text" name="url_pattern" id="formUrlPattern" lay-verify="required" 
+                           placeholder="如: https://example.com/search?keyword={关键字}" class="layui-input">
+                </div>
+            </div>
+            <div class="layui-form-item">
+                <label class="layui-form-label">请求方法</label>
+                <div class="layui-input-block">
+                    <select name="request_method" id="formMethod" class="layui-select">
+                        <option value="GET">GET</option>
+                        <option value="POST">POST</option>
+                    </select>
+                </div>
+            </div>
+            <div class="layui-form-item">
+                <label class="layui-form-label">请求头</label>
+                <div class="layui-input-block">
+                    <textarea name="headers" id="formHeaders" placeholder="每行一个请求头，格式: Key: Value" 
+                              class="layui-textarea" style="height: 200px;"></textarea>
+                </div>
+            </div>
+            <div class="layui-form-item">
+                <label class="layui-form-label">启用状态</label>
+                <div class="layui-input-block">
+                    <input type="checkbox" name="enabled" id="formEnabled" lay-skin="switch" checked>
+                </div>
+            </div>
+            <div class="layui-form-item" style="text-align: right;">
+                <button type="button" class="layui-btn layui-btn-normal" id="formCancel">取消</button>
+                <button type="button" class="layui-btn" lay-submit lay-filter="sourceSubmit">确认</button>
+            </div>
+        </form>
+    </div>
+
+    <!-- 采集结果弹窗 -->
+    <div style="display: none;" id="collectModal">
+        <div style="padding: 20px;">
+            <div class="layui-form-item">
+                <label class="layui-form-label">采集关键字</label>
+                <div class="layui-input-block">
+                    <input type="text" id="collectKeyword" placeholder="输入采集关键字" class="keyword-input">
+                </div>
+            </div>
+            <div class="layui-form-item" style="text-align: right;">
+                <button type="button" class="layui-btn layui-btn-normal" id="collectCancel">取消</button>
+                <button type="button" class="layui-btn" id="collectSubmit">开始采集</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 采集结果详情弹窗 -->
+    <div style="display: none;" id="resultModal">
+        <div style="padding: 20px;">
+            <div id="resultContent"></div>
+        </div>
+    </div>
+
+    <script src="/static/dist/layui-v2.13.6/layui/layui.js"></script>
+    <script>
+        layui.use(['table', 'layer', 'form'], function() {
+            var table = layui.table;
+            var layer = layui.layer;
+            var form = layui.form;
+            var $ = layui.$;
+
+            var tableIns = table.render({
+                elem: '#scoutTable',
+                url: '/api/scout',
+                method: 'get',
+                page: true,
+                limit: 20,
+                id: 'scoutTableId',
+                toolbar: '#toolbarDemo',
+                defaultToolbar: ['filter', 'exports'],
+                cols: [[
+                    {type: 'checkbox', fixed: 'left'},
+                    {field: 'id', title: 'ID', width: 80, sort: true},
+                    {field: 'name', title: '数据源名称', width: 180},
+                    {field: 'url_pattern', title: 'URL模式', width: 350},
+                    {field: 'request_method', title: '请求方法', width: 100},
+                    {field: 'enabled', title: '状态', width: 100, templet: '#statusTpl'},
+                    {field: 'create_at', title: '创建时间', width: 180},
+                    {title: '操作', width: 220, toolbar: '#barDemo', fixed: 'right'}
+                ]],
+                done: function(res, curr, count) {
+                    updateBatchBtn();
+                }
+            });
+
+            table.on('checkbox(scoutTable)', function(obj) {
+                updateBatchBtn();
+            });
+
+            function updateBatchBtn() {
+                var checkStatus = table.checkStatus('scoutTableId');
+                if (checkStatus.data.length > 0) {
+                    $('#batchCollectBtn').show();
+                } else {
+                    $('#batchCollectBtn').hide();
+                }
+            }
+
+            table.on('tool(scoutTable)', function(obj) {
+                var data = obj.data;
+                if (obj.event === 'edit') {
+                    editSource(data);
+                } else if (obj.event === 'del') {
+                    deleteSource(data.id, data.name);
+                } else if (obj.event === 'collect') {
+                    collectData(data.id, data.name, data.url_pattern);
+                } else if (obj.event === 'toggle') {
+                    toggleStatus(data.id, data.enabled);
+                }
+            });
+
+            $('#addBtn').click(function() {
+                $('#sourceForm')[0].reset();
+                $('#formId').val('');
+                $('#formMethod').val('GET');
+                $('#formEnabled').prop('checked', true);
+                form.render();
+                
+                layer.open({
+                    type: 1,
+                    title: '新增瞭望数据源',
+                    content: $('#sourceModal'),
+                    area: ['550px', '500px'],
+                    closeBtn: 1
+                });
+            });
+
+            function editSource(data) {
+                $('#formId').val(data.id);
+                $('#formName').val(data.name);
+                $('#formUrlPattern').val(data.url_pattern);
+                $('#formMethod').val(data.request_method);
+                $('#formHeaders').val(data.headers || '');
+                $('#formEnabled').prop('checked', data.enabled == 1);
+                form.render();
+                
+                layer.open({
+                    type: 1,
+                    title: '编辑瞭望数据源',
+                    content: $('#sourceModal'),
+                    area: ['550px', '500px'],
+                    closeBtn: 1
+                });
+            }
+
+            function deleteSource(id, name) {
+                layer.confirm('确定要删除数据源 "' + name + '" 吗？', function(index) {
+                    $.ajax({
+                        url: '/api/scout',
+                        type: 'post',
+                        data: { action: 'delete', id: id, _xsrf: document.getElementById('xsrf_token').value },
+                        success: function(res) {
+                            if (res.code === 0) {
+                                layer.msg(res.msg, {icon: 1});
+                                tableIns.reload();
+                            } else {
+                                layer.msg(res.msg, {icon: 2});
+                            }
+                        }
+                    });
+                    layer.close(index);
+                });
+            }
+
+            function toggleStatus(id, enabled) {
+                var action = enabled == 1 ? '禁用' : '启用';
+                layer.confirm('确定要' + action + '这个数据源吗？', function(index) {
+                    $.ajax({
+                        url: '/api/scout',
+                        type: 'post',
+                        data: { action: 'toggle', id: id, _xsrf: document.getElementById('xsrf_token').value },
+                        success: function(res) {
+                            if (res.code === 0) {
+                                layer.msg(res.msg, {icon: 1});
+                                tableIns.reload();
+                            } else {
+                                layer.msg(res.msg, {icon: 2});
+                            }
+                        }
+                    });
+                    layer.close(index);
+                });
+            }
+
+            var currentCollectId = null;
+            var currentCollectName = null;
+            var currentUrlPattern = null;
+
+            function collectData(id, name, urlPattern) {
+                currentCollectId = id;
+                currentCollectName = name;
+                currentUrlPattern = urlPattern;
+                $('#collectKeyword').val('');
+                
+                layer.open({
+                    type: 1,
+                    title: '采集数据 - ' + name,
+                    content: $('#collectModal'),
+                    area: ['450px', '180px'],
+                    closeBtn: 1
+                });
+            }
+
+            $('#collectSubmit').click(function() {
+                var keyword = $('#collectKeyword').val();
+                
+                if (currentUrlPattern.includes('{关键字}') && !keyword) {
+                    layer.msg('URL包含关键字占位符，请输入关键字', {icon: 2});
+                    return;
+                }
+
+                $.ajax({
+                    url: '/api/scout',
+                    type: 'post',
+                    data: { 
+                        action: 'collect', 
+                        id: currentCollectId,
+                        keywords: keyword,
+                        _xsrf: document.getElementById('xsrf_token').value
+                    },
+                    success: function(res) {
+                        layer.closeAll();
+                        if (res.code === 0) {
+                            var content = '<div style="margin-bottom: 20px;">';
+                            content += '<p><strong>状态码:</strong> ' + res.data.status_code + '</p>';
+                            content += '<p><strong>URL:</strong> ' + res.data.url + '</p>';
+                            content += '<p><strong>内容长度:</strong> ' + res.data.content_length + ' 字符</p>';
+                            content += '</div>';
+                            content += '<div class="code-preview"><pre>' + escapeHtml(res.data.content) + '</pre></div>';
+                            
+                            $('#resultContent').html(content);
+                            layer.open({
+                                type: 1,
+                                title: '采集结果 - ' + currentCollectName,
+                                content: $('#resultModal'),
+                                area: ['800px', '600px'],
+                                closeBtn: 1,
+                                maxmin: true
+                            });
+                        } else {
+                            layer.msg(res.msg, {icon: 2});
+                        }
+                    },
+                    error: function() {
+                        layer.closeAll();
+                        layer.msg('采集失败', {icon: 2});
+                    }
+                });
+            });
+
+            $('#collectCancel').click(function() {
+                layer.closeAll();
+            });
+
+            $('#batchCollectBtn').click(function() {
+                var checkStatus = table.checkStatus('scoutTableId');
+                var ids = checkStatus.data.map(function(item) { return item.id; }).join(',');
+                
+                layer.prompt({
+                    title: '批量采集 - 输入关键字',
+                    formType: 0,
+                    value: '',
+                    placeholder: '输入采集关键字（如果URL包含{关键字}占位符）'
+                }, function(keyword, index) {
+                    layer.close(index);
+                    
+                    var loading = layer.load(2);
+                    
+                    $.ajax({
+                        url: '/api/scout',
+                        type: 'post',
+                        data: { 
+                            action: 'batchCollect', 
+                            ids: ids,
+                            keywords: keyword,
+                            _xsrf: document.getElementById('xsrf_token').value
+                        },
+                        success: function(res) {
+                            layer.close(loading);
+                            if (res.code === 0) {
+                                var html = '<div style="padding: 10px;">';
+                                html += '<p style="margin-bottom: 15px;">批量采集完成：成功 ' + res.success_count + ' 个，失败 ' + res.fail_count + ' 个</p>';
+                                html += '<ul>';
+                                res.data.forEach(function(item) {
+                                    var status = item.success ? '<span style="color: #2ed573;">成功</span>' : '<span style="color: #ff6b6b;">失败</span>';
+                                    html += '<li style="margin-bottom: 5px;">' + item.name + ' - ' + status;
+                                    if (!item.success) {
+                                        html += ' (' + item.msg + ')';
+                                    }
+                                    html += '</li>';
+                                });
+                                html += '</ul></div>';
+                                
+                                layer.open({
+                                    type: 1,
+                                    title: '批量采集结果',
+                                    content: html,
+                                    area: ['500px', '400px'],
+                                    closeBtn: 1
+                                });
+                            } else {
+                                layer.msg(res.msg, {icon: 2});
+                            }
+                        },
+                        error: function() {
+                            layer.close(loading);
+                            layer.msg('批量采集失败', {icon: 2});
+                        }
+                    });
+                });
+            });
+
+            form.on('submit(sourceSubmit)', function(data) {
+                var action = $('#formId').val() ? 'edit' : 'add';
+                
+                $.ajax({
+                    url: '/api/scout',
+                    type: 'post',
+                    data: {
+                        action: action,
+                        id: $('#formId').val(),
+                        name: $('#formName').val(),
+                        url_pattern: $('#formUrlPattern').val(),
+                        request_method: $('#formMethod').val(),
+                        headers: $('#formHeaders').val(),
+                        enabled: $('#formEnabled').prop('checked'),
+                        _xsrf: document.getElementById('xsrf_token').value
+                    },
+                    success: function(res) {
+                        if (res.code === 0) {
+                            layer.msg(res.msg, {icon: 1});
+                            layer.closeAll();
+                            tableIns.reload();
+                        } else {
+                            layer.msg(res.msg, {icon: 2});
+                        }
+                    }
+                });
+                return false;
+            });
+
+            $('#formCancel').click(function() {
+                layer.closeAll();
+            });
+
+            function escapeHtml(text) {
+                var map = {
+                    '&': '&amp;',
+                    '<': '&lt;',
+                    '>': '&gt;',
+                    '"': '&quot;',
+                    "'": '&#039;'
+                };
+                return text.replace(/[&<>"']/g, function(m) { return map[m]; });
+            }
+        });
+    </script>
+</body>
+</html>

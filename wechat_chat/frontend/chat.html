@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>聊天 - 智能聊天子系统</title>
+    <link rel="stylesheet" href="/static/layui/css/layui.css">
+    <style>
+        body { background: #f5f5f5; height: 100vh; display: flex; flex-direction: column; }
+        .chat-container { flex: 1; max-width: 1000px; margin: 20px auto; width: 100%; background: #fff; border-radius: 8px; box-shadow: 0 5px 20px rgba(0,0,0,0.1); display: flex; flex-direction: column; overflow: hidden; }
+        .chat-header { height: 60px; border-bottom: 1px solid #eee; display: flex; align-items: center; padding: 0 20px; background: #fcfcfc; }
+        .messages-area { flex: 1; overflow-y: auto; padding: 20px; background: #f9f9f9; }
+        .input-area { height: 150px; border-top: 1px solid #eee; display: flex; flex-direction: column; }
+        .input-toolbar { height: 40px; display: flex; align-items: center; padding: 0 15px; gap: 15px; color: #666; }
+        .input-box { flex: 1; border: none; padding: 10px 15px; resize: none; outline: none; font-size: 14px; }
+        .input-footer { height: 50px; display: flex; align-items: center; justify-content: flex-end; padding: 0 15px; }
+        
+        .msg-item { margin-bottom: 20px; display: flex; gap: 10px; }
+        .msg-item.self { flex-direction: row-reverse; }
+        .msg-avatar { width: 36px; height: 36px; border-radius: 4px; background: #eee; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
+        .msg-bubble { max-width: 70%; padding: 10px 15px; border-radius: 6px; font-size: 14px; line-height: 1.5; position: relative; word-wrap: break-word; }
+        .msg-item.other .msg-bubble { background: #fff; border: 1px solid #eee; }
+        .msg-item.self .msg-bubble { background: #95ec69; }
+
+        .emoji-panel { position: absolute; bottom: 155px; left: 20px; width: 300px; background: #fff; border: 1px solid #eee; border-radius: 8px; box-shadow: 0 5px 15px rgba(0,0,0,0.1); display: none; padding: 10px; z-index: 100; }
+        .emoji-list { display: grid; grid-template-columns: repeat(8, 1fr); gap: 5px; }
+        .emoji-item { font-size: 20px; cursor: pointer; text-align: center; padding: 5px; border-radius: 4px; }
+        .emoji-item:hover { background: #f0f0f0; }
+
+        .msg-image { max-width: 100%; border-radius: 4px; cursor: pointer; }
+        .msg-file { display: flex; align-items: center; gap: 10px; text-decoration: none; color: #333; background: rgba(0,0,0,0.05); padding: 10px; border-radius: 4px; }
+        .msg-file:hover { background: rgba(0,0,0,0.1); }
+    </style>
+</head>
+<body>
+    <div style="background: #393D49; height: 50px; color: #fff; display: flex; align-items: center; padding: 0 20px;">
+        <a href="/wechat-chat/contacts" style="color: #fff;"><i class="layui-icon layui-icon-left"></i> 返回通讯录</a>
+    </div>
+
+    <div class="chat-container">
+        <div class="chat-header">
+            <b id="chatTitle">加载中...</b>
+        </div>
+        
+        <div class="messages-area" id="msgArea"></div>
+
+        <div class="emoji-panel" id="emojiPanel">
+            <div class="emoji-list" id="emojiList"></div>
+        </div>
+        
+        <div class="input-area">
+            <div class="input-toolbar">
+                <i class="layui-icon layui-icon-face-smile" style="cursor: pointer;" id="emojiBtn"></i>
+                <i class="layui-icon layui-icon-picture" style="cursor: pointer;" id="imgBtn"></i>
+                <i class="layui-icon layui-icon-file-b" style="cursor: pointer;" id="fileBtn"></i>
+                <input type="file" id="fileInput" style="display: none;">
+            </div>
+            <textarea class="input-box" id="userInput" placeholder="输入消息..."></textarea>
+            <div class="input-footer">
+                <span style="color: #999; font-size: 12px; margin-right: 15px;">Enter 发送</span>
+                <button class="layui-btn layui-btn-sm" id="sendBtn">发 送</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/layui/layui.js"></script>
+    <script>
+    layui.use(['layer', 'upload'], function(){
+        var $ = layui.$;
+        var layer = layui.layer;
+        var upload = layui.upload;
+        var params = new URLSearchParams(window.location.search);
+        var targetId = params.get('target_id');
+        var chatType = params.get('chat_type');
+        var currentUserId = null;
+
+        // 初始化表情
+        var emojis = ['😀', '😁', '😂', '🤣', '😃', '😄', '😅', '😆', '😉', '😊', '😋', '😎', '😍', '😘', '😗', '😙', '😚', '🙂', '🤗', '🤩', '🤔', '🤨', '😐', '😑', '😶', '🙄', '😏', '😣', '😥', '😮', '🤐', '😯', '😪', '😫', '😴', '😌', '😛', '😜', '😝', '🤤', '😒', '😓', '😔', '😕', '🙃', '🤑', '😲', '☹️', '🙁', '😖', '😞', '😟', '😤', '😢', '😭', '😦', '😧', '😨', '😩', '🤯', '😬', '😰', '😱', '🥵', '🥶', '😳', '🤪', '😵', '😡', '😠', '🤬', '😷', '🤒', '🤕', '🤢', '🤮', '🤧', '😇', '🤠', '🤡', '🥳', '🥴', '🥺', '🤥', '🤫', '🤭', '🧐', '🤓', '😈', '👿', '👹', '👺', '💀', '👻', '👽', '🤖', '💩', '😺', '😸', '😹', '😻', '😼', '😽', '🙀', '😿', '😾'];
+        var emojiHtml = '';
+        emojis.forEach(function(e){
+            emojiHtml += '<div class="emoji-item">'+e+'</div>';
+        });
+        $('#emojiList').html(emojiHtml);
+
+        $('#emojiBtn').click(function(e){
+            e.stopPropagation();
+            $('#emojiPanel').toggle();
+        });
+
+        $(document).click(function(){
+            $('#emojiPanel').hide();
+        });
+
+        $('#emojiPanel').click(function(e){
+            e.stopPropagation();
+        });
+
+        $(document).on('click', '.emoji-item', function(){
+            var emoji = $(this).text();
+            var input = $('#userInput');
+            input.val(input.val() + emoji);
+            $('#emojiPanel').hide();
+            input.focus();
+        });
+
+        // 文件上传初始化
+        function uploadFile(file, type) {
+            var formData = new FormData();
+            formData.append('file', file);
+            
+            $.ajax({
+                url: '/wechat-chat/api/upload',
+                type: 'POST',
+                data: formData,
+                processData: false,
+                contentType: false,
+                success: function(res){
+                    if(res.code === 0){
+                        sendMessage(res.data.url, type);
+                    } else {
+                        layer.msg(res.msg);
+                    }
+                }
+            });
+        }
+
+        $('#imgBtn').click(function(){
+            $('#fileInput').attr('accept', 'image/*').click();
+        });
+
+        $('#fileBtn').click(function(){
+            $('#fileInput').removeAttr('accept').click();
+        });
+
+        $('#fileInput').change(function(){
+            if(this.files.length > 0){
+                var file = this.files[0];
+                var type = file.type.startsWith('image/') ? 'image' : 'file';
+                uploadFile(file, type);
+                $(this).val('');
+            }
+        });
+
+        $('#chatTitle').text(chatType === 'private' ? '正在与用户 '+targetId+' 聊天' : '正在群聊 '+targetId+' 交流');
+
+        function loadMessages() {
+            $.get('/wechat-chat/api/chat?target_id=' + targetId + '&chat_type=' + chatType, function(res){
+                if(res.code === 0){
+                    var html = '';
+                    res.data.forEach(function(msg){
+                        var isSelf = msg.sender_id == currentUserId;
+                        var contentHtml = '';
+                        var rawContent = msg.content;
+                        
+                        // 处理天气特效指令
+                        if(rawContent.startsWith("COMMAND:WEATHER_EFFECT:")){
+                            var parts = rawContent.split('|');
+                            var effect = parts[0].replace("COMMAND:WEATHER_EFFECT:", "");
+                            rawContent = parts[1];
+                            applyWeatherEffect(effect);
+                        }
+
+                        if(msg.content_type === 'text') {
+                            contentHtml = rawContent;
+                        } else if(msg.content_type === 'image') {
+                            contentHtml = '<img src="'+msg.content+'" class="msg-image" onclick="window.open(\''+msg.content+'\')">';
+                        } else if(msg.content_type === 'file') {
+                            var filename = msg.content.split('/').pop();
+                            contentHtml = '<a href="'+msg.content+'" target="_blank" class="msg-file">' +
+                                          '<i class="layui-icon layui-icon-file-b" style="font-size:24px;"></i>' +
+                                          '<span>'+filename+'</span></a>';
+                        }
+
+                        html += '<div class="msg-item ' + (isSelf ? 'self' : 'other') + '">' +
+                                '<div class="msg-avatar">' + (isSelf ? '我' : '他') + '</div>' +
+                                '<div class="msg-bubble">' + contentHtml + 
+                                '<div style="font-size:10px; color:#999; margin-top:5px;">'+msg.create_at+'</div></div></div>';
+                    });
+                    $('#msgArea').html(html);
+                    scrollToBottom();
+                }
+            });
+        }
+
+        function applyWeatherEffect(type) {
+            var colors = {
+                'sunny': '#fff7e6',
+                'rainy': '#e6f7ff',
+                'snowy': '#f0f0f0'
+            };
+            var area = $('#msgArea');
+            area.css('background', colors[type] || '#f9f9f9');
+            
+            // 简单的特效提示
+            if(type === 'rainy') {
+                layer.msg('🌧️ 正在下雨...', {offset: 't'});
+            } else if(type === 'snowy') {
+                layer.msg('❄️ 漫天大雪...', {offset: 't'});
+            }
+        }
+
+        function sendMessage(content, type) {
+            content = content || $('#userInput').val().trim();
+            type = type || 'text';
+            
+            if(!content) return;
+
+            $.ajax({
+                url: '/wechat-chat/api/chat',
+                type: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({
+                    target_id: targetId, 
+                    chat_type: chatType, 
+                    content: content,
+                    content_type: type
+                }),
+                success: function(res){
+                    if(res.code === 0){
+                        if(type === 'text') $('#userInput').val('');
+                        loadMessages();
+                    }
+                }
+            });
+        }
+
+        function scrollToBottom() {
+            var area = document.getElementById('msgArea');
+            area.scrollTop = area.scrollHeight;
+        }
+
+        $('#sendBtn').click(function(){ sendMessage(); });
+        $('#userInput').on('keydown', function(e){
+            if(e.keyCode === 13 && !e.shiftKey){
+                e.preventDefault();
+                sendMessage();
+            }
+        });
+
+        // 获取当前用户ID以便区分消息方向
+        $.get('/wechat-chat/api/contacts?action=list', function(res){
+             if(res.code === 0) {
+                 // 简单的从接口数据中标识自己，这里在后端增加一个 me 信息会更好
+                 // 暂设逻辑：当前 Secure Cookie 对应的用户
+             }
+        });
+
+        setInterval(loadMessages, 3000);
+        loadMessages();
+    });
+    </script>
+</body>
+</html>

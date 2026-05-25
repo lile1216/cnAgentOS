@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>模型测试 - cnAgentOS</title>
+    <link rel="stylesheet" href="/static/dist/layui-v2.13.6/layui/css/layui.css">
+    <style>
+        body {
+            background: linear-gradient(135deg, #0f0f1a 0%, #1a1a2e 50%, #16213e 100%);
+            min-height: 100vh;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+        }
+        .chat-header {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 20px 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+        .model-badge {
+            background: linear-gradient(135deg, #00d4ff 0%, #7b2fff 100%);
+            padding: 8px 16px;
+            border-radius: 20px;
+            color: #fff;
+            font-size: 14px;
+            font-weight: 500;
+        }
+        .header-title {
+            color: #fff;
+            font-size: 18px;
+            font-weight: 600;
+        }
+        .header-right {
+            display: flex;
+            gap: 15px;
+        }
+        .switch-label {
+            color: #8892b0;
+            font-size: 13px;
+            margin-right: 8px;
+        }
+        .chat-container {
+            flex: 1;
+            padding: 30px;
+            overflow-y: auto;
+        }
+        .chat-messages {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+        .message {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 30px;
+            animation: fadeIn 0.3s ease;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .message.user {
+            justify-content: flex-end;
+        }
+        .message.bot {
+            justify-content: flex-start;
+        }
+        .avatar {
+            width: 45px;
+            height: 45px;
+            border-radius: 50%;
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+        }
+        .message.user .avatar {
+            background: linear-gradient(135deg, #00d4ff 0%, #7b2fff 100%);
+        }
+        .message.bot .avatar {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+        }
+        .message-content {
+            max-width: 70%;
+            padding: 15px 20px;
+            border-radius: 16px;
+            line-height: 1.6;
+        }
+        .message.user .message-content {
+            background: linear-gradient(135deg, #00d4ff 0%, #7b2fff 100%);
+            color: #fff;
+            border-bottom-right-radius: 4px;
+        }
+        .message.bot .message-content {
+            background: rgba(255, 255, 255, 0.08);
+            color: #e6e6e6;
+            border-bottom-left-radius: 4px;
+        }
+        .message-time {
+            font-size: 11px;
+            color: #666;
+            margin-top: 5px;
+            text-align: right;
+        }
+        .typing-indicator {
+            display: flex;
+            gap: 8px;
+            padding: 15px;
+            background: rgba(255, 255, 255, 0.08);
+            border-radius: 16px;
+            border-bottom-left-radius: 4px;
+            width: fit-content;
+        }
+        .typing-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #00d4ff;
+            animation: typing 1.4s infinite ease-in-out;
+        }
+        .typing-dot:nth-child(1) { animation-delay: 0s; }
+        .typing-dot:nth-child(2) { animation-delay: 0.2s; }
+        .typing-dot:nth-child(3) { animation-delay: 0.4s; }
+        @keyframes typing {
+            0%, 80%, 100% { transform: scale(0.6); opacity: 0.5; }
+            40% { transform: scale(1); opacity: 1; }
+        }
+        .chat-input-area {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 20px 30px;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .input-container {
+            max-width: 900px;
+            margin: 0 auto;
+            display: flex;
+            gap: 15px;
+        }
+        .input-wrapper {
+            flex: 1;
+            background: rgba(255, 255, 255, 0.08);
+            border-radius: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            overflow: hidden;
+            display: flex;
+        }
+        .input-wrapper textarea {
+            flex: 1;
+            background: transparent;
+            border: none;
+            outline: none;
+            padding: 15px 20px;
+            color: #fff;
+            font-size: 14px;
+            resize: none;
+            font-family: inherit;
+            line-height: 1.5;
+        }
+        .input-wrapper textarea::placeholder {
+            color: #666;
+        }
+        .send-btn {
+            background: linear-gradient(135deg, #00d4ff 0%, #7b2fff 100%);
+            border: none;
+            border-radius: 12px;
+            padding: 0 30px;
+            color: #fff;
+            font-size: 15px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .send-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(0, 212, 255, 0.4);
+        }
+        .send-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+        .layui-switch {
+            margin-top: 4px;
+        }
+        .layui-form-switch {
+            background: rgba(255, 255, 255, 0.1);
+        }
+        .layui-form-onswitch {
+            background: linear-gradient(135deg, #00d4ff 0%, #7b2fff 100%);
+        }
+        @media (max-width: 768px) {
+            .message-content {
+                max-width: 85%;
+            }
+            .chat-header {
+                padding: 15px 20px;
+                flex-wrap: wrap;
+                gap: 10px;
+            }
+            .chat-input-area {
+                padding: 15px 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="chat-header">
+        <div class="header-left">
+            <div class="header-title">模型对话测试</div>
+            <span class="model-badge" id="modelBadge">{{ model_info.name if model_info else '选择模型' }}</span>
+        </div>
+        <div class="header-right">
+            <label class="switch-label">流式响应</label>
+            <input type="checkbox" name="stream" id="streamSwitch" lay-skin="switch" checked>
+            <button class="layui-btn layui-btn-normal" onclick="window.close()">关闭</button>
+        </div>
+    </div>
+
+    <div class="chat-container" id="chatContainer">
+        <div class="chat-messages" id="chatMessages">
+            <div class="message bot">
+                <div class="avatar">
+                    <i class="layui-icon layui-icon-robot"></i>
+                </div>
+                <div class="message-content">
+                    你好！我是AI助手，有什么我可以帮助你的吗？
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="chat-input-area">
+        <div class="input-container">
+            <div class="input-wrapper">
+                <textarea id="messageInput" placeholder="输入你的问题..." rows="2"></textarea>
+            </div>
+            <button class="send-btn" id="sendBtn">
+                <i class="layui-icon layui-icon-send"></i>
+                发送
+            </button>
+        </div>
+    </div>
+
+    <script src="/static/dist/layui-v2.13.6/layui/layui.js"></script>
+    <script>
+        layui.use(['layer', 'form'], function() {
+            var layer = layui.layer;
+            var form = layui.form;
+            var $ = layui.$;
+
+            var modelId = "{{ model_info.id if model_info else '' }}";
+            var isStreaming = true;
+
+            form.on('switch(stream)', function(data) {
+                isStreaming = data.elem.checked;
+            });
+
+            $('#messageInput').keydown(function(e) {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    sendMessage();
+                }
+            });
+
+            $('#sendBtn').click(sendMessage);
+
+            function sendMessage() {
+                var message = $('#messageInput').val().trim();
+                if (!message) return;
+                if (!modelId) {
+                    layer.msg('请先选择一个模型', {icon: 2});
+                    return;
+                }
+
+                $('#messageInput').val('');
+                $('#sendBtn').prop('disabled', true);
+
+                // 添加用户消息
+                addMessage('user', message);
+
+                // 添加机器人回复区域
+                var botMessageId = 'bot-' + Date.now();
+                addMessage('bot', '', botMessageId);
+
+                if (isStreaming) {
+                    sendStreamRequest(message, botMessageId);
+                } else {
+                    sendNormalRequest(message, botMessageId);
+                }
+            }
+
+            function sendStreamRequest(message, messageId) {
+                var eventSource = new EventSource('/api/models/chat?' + new URLSearchParams({
+                    model_id: modelId,
+                    message: message,
+                    stream: true
+                }));
+
+                eventSource.onmessage = function(event) {
+                    try {
+                        var data = JSON.parse(event.data);
+                        if (data.done) {
+                            eventSource.close();
+                            $('#sendBtn').prop('disabled', false);
+                        } else if (data.content) {
+                            appendToMessage(messageId, data.content);
+                        }
+                    } catch (e) {
+                        console.error('解析错误:', e);
+                    }
+                };
+
+                eventSource.onerror = function(error) {
+                    console.error('SSE错误:', error);
+                    eventSource.close();
+                    $('#sendBtn').prop('disabled', false);
+                    appendToMessage(messageId, '\n\n连接错误，请重试');
+                };
+            }
+
+            function sendNormalRequest(message, messageId) {
+                $.ajax({
+                    url: '/api/models/chat',
+                    type: 'post',
+                    data: {
+                        model_id: modelId,
+                        message: message,
+                        stream: false
+                    },
+                    success: function(res) {
+                        if (res.code === 0) {
+                            updateMessage(messageId, res.data);
+                        } else {
+                            updateMessage(messageId, '错误: ' + res.msg);
+                        }
+                    },
+                    error: function() {
+                        updateMessage(messageId, '请求失败，请重试');
+                    },
+                    complete: function() {
+                        $('#sendBtn').prop('disabled', false);
+                    }
+                });
+            }
+
+            function addMessage(type, content, id) {
+                var avatarIcon = type === 'user' ? 'layui-icon-user' : 'layui-icon-robot';
+                var messageId = id || (type + '-' + Date.now());
+                
+                var html = `
+                    <div class="message ${type}" id="${messageId}">
+                        <div class="avatar">
+                            <i class="layui-icon ${avatarIcon}"></i>
+                        </div>
+                        <div class="message-content">${content || '<div class="typing-indicator"><span class="typing-dot"></span><span class="typing-dot"></span><span class="typing-dot"></span></div>'}</div>
+                    </div>
+                `;
+                
+                $('#chatMessages').append(html);
+                scrollToBottom();
+            }
+
+            function appendToMessage(messageId, content) {
+                var $message = $('#' + messageId + ' .message-content');
+                var currentContent = $message.html();
+                
+                // 移除打字指示器
+                if (currentContent.includes('typing-indicator')) {
+                    $message.html(content);
+                } else {
+                    $message.html(currentContent + content);
+                }
+                
+                scrollToBottom();
+            }
+
+            function updateMessage(messageId, content) {
+                $('#' + messageId + ' .message-content').html(content);
+                scrollToBottom();
+            }
+
+            function scrollToBottom() {
+                var chatContainer = document.getElementById('chatContainer');
+                chatContainer.scrollTop = chatContainer.scrollHeight;
+            }
+        });
+    </script>
+</body>
+</html>

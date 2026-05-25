@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>欢迎页 - cnAgentOS管理系统</title>
+    <link rel="stylesheet" href="/static/dist/layui-v2.13.6/layui/css/layui.css">
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: #f3f3f4;
+            font-family: 'Microsoft YaHei', sans-serif;
+        }
+        .welcome-container {
+            padding: 30px;
+        }
+        .welcome-card {
+            background: white;
+            border-radius: 8px;
+            padding: 40px;
+            box-shadow: 0 2px 12px 0 rgba(0,0,0,0.08);
+            margin-bottom: 20px;
+        }
+        .welcome-title {
+            font-size: 28px;
+            color: #676a6c;
+            font-weight: 600;
+            margin-bottom: 10px;
+        }
+        .welcome-subtitle {
+            color: #999;
+            font-size: 14px;
+        }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 20px;
+        }
+        .stat-card {
+            background: white;
+            border-radius: 8px;
+            padding: 25px;
+            box-shadow: 0 2px 12px 0 rgba(0,0,0,0.08);
+            text-align: center;
+            transition: all 0.3s ease;
+        }
+        .stat-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 16px 0 rgba(0,0,0,0.12);
+        }
+        .stat-icon {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            margin: 0 auto 15px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 28px;
+        }
+        .stat-icon.users {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        .stat-icon.data {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+        }
+        .stat-icon.model {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            color: white;
+        }
+        .stat-icon.qa {
+            background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+            color: white;
+        }
+        .stat-value {
+            font-size: 36px;
+            font-weight: 700;
+            color: #1e3c72;
+            margin-bottom: 5px;
+        }
+        .stat-label {
+            color: #999;
+            font-size: 14px;
+        }
+        .quick-links {
+            margin-top: 30px;
+        }
+        .links-title {
+            font-size: 16px;
+            color: #676a6c;
+            font-weight: 600;
+            margin-bottom: 15px;
+        }
+        .links-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+        }
+        .link-card {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 12px 0 rgba(0,0,0,0.08);
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+        }
+        .link-card:hover {
+            background: #1e3c72;
+            transform: translateX(5px);
+        }
+        .link-card:hover .link-icon,
+        .link-card:hover .link-text {
+            color: white;
+        }
+        .link-icon {
+            width: 45px;
+            height: 45px;
+            border-radius: 10px;
+            background: #f3f3f4;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 22px;
+            color: #676a6c;
+            margin-right: 15px;
+            transition: all 0.3s ease;
+        }
+        .link-card:hover .link-icon {
+            background: rgba(255, 255, 255, 0.2);
+        }
+        .link-text {
+            font-size: 14px;
+            color: #676a6c;
+            font-weight: 500;
+        }
+        .system-info {
+            margin-top: 30px;
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 12px 0 rgba(0,0,0,0.08);
+        }
+        .info-row {
+            display: flex;
+            padding: 10px 0;
+            border-bottom: 1px solid #f3f3f4;
+        }
+        .info-row:last-child {
+            border-bottom: none;
+        }
+        .info-label {
+            width: 120px;
+            color: #999;
+            font-size: 14px;
+        }
+        .info-value {
+            color: #676a6c;
+            font-size: 14px;
+        }
+        @media (max-width: 992px) {
+            .stats-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            .links-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+        @media (max-width: 576px) {
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+            .links-grid {
+                grid-template-columns: 1fr;
+            }
+            .welcome-title {
+                font-size: 22px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="welcome-container">
+        <!-- 欢迎卡片 -->
+        <div class="welcome-card">
+            <div class="welcome-title">欢迎使用 cnAgentOS 智能瞭望与问数系统</div>
+            <div class="welcome-subtitle">AI-powered Intelligent Observation and Data Query System</div>
+        </div>
+        
+        <!-- 统计卡片 -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-icon users">
+                    <i class="layui-icon layui-icon-user"></i>
+                </div>
+                <div class="stat-value">1</div>
+                <div class="stat-label">用户总数</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon data">
+                    <i class="layui-icon layui-icon-data"></i>
+                </div>
+                <div class="stat-value">0</div>
+                <div class="stat-label">数据采集</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon model">
+                    <i class="layui-icon layui-icon-server"></i>
+                </div>
+                <div class="stat-value">0</div>
+                <div class="stat-label">模型调用</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon qa">
+                    <i class="layui-icon layui-icon-help-circle"></i>
+                </div>
+                <div class="stat-value">0</div>
+                <div class="stat-label">智能问答</div>
+            </div>
+        </div>
+        
+        <!-- 快捷链接 -->
+        <div class="quick-links">
+            <div class="links-title">快捷操作</div>
+            <div class="links-grid">
+                <div class="link-card" onclick="navigateTo('/admin/users')">
+                    <div class="link-icon">
+                        <i class="layui-icon layui-icon-user"></i>
+                    </div>
+                    <div class="link-text">用户管理</div>
+                </div>
+                <div class="link-card" onclick="navigateTo('/admin/models')">
+                    <div class="link-icon">
+                        <i class="layui-icon layui-icon-server"></i>
+                    </div>
+                    <div class="link-text">模型引擎</div>
+                </div>
+                <div class="link-card" onclick="navigateTo('/admin/sources')">
+                    <div class="link-icon">
+                        <i class="layui-icon layui-icon-search"></i>
+                    </div>
+                    <div class="link-text">瞭望管理</div>
+                </div>
+                <div class="link-card" onclick="navigateTo('/admin/data/text')">
+                    <div class="link-icon">
+                        <i class="layui-icon layui-icon-database"></i>
+                    </div>
+                    <div class="link-text">数据仓库</div>
+                </div>
+                <div class="link-card" onclick="navigateTo('/admin/dashboard')">
+                    <div class="link-icon">
+                        <i class="layui-icon layui-icon-chart"></i>
+                    </div>
+                    <div class="link-text">数智大屏</div>
+                </div>
+                <div class="link-card" onclick="navigateTo('/admin/system')">
+                    <div class="link-icon">
+                        <i class="layui-icon layui-icon-set-fill"></i>
+                    </div>
+                    <div class="link-text">系统设置</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 系统信息 -->
+        <div class="system-info">
+            <div class="links-title" style="margin-bottom: 10px;">系统信息</div>
+            <div class="info-row">
+                <div class="info-label">系统版本</div>
+                <div class="info-value">v1.0.0</div>
+            </div>
+            <div class="info-row">
+                <div class="info-label">框架版本</div>
+                <div class="info-value">Tornado 6.5.5</div>
+            </div>
+            <div class="info-row">
+                <div class="info-label">UI组件</div>
+                <div class="info-value">Layui 2.13.6</div>
+            </div>
+            <div class="info-row">
+                <div class="info-label">数据库</div>
+                <div class="info-value">SQLite3</div>
+            </div>
+            <div class="info-row">
+                <div class="info-label">运行状态</div>
+                <div class="info-value" style="color: #10b981;">正常运行</div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="/static/dist/layui-v2.13.6/layui/layui.js"></script>
+    <script>
+        function navigateTo(url) {
+            if (window.parent && window.parent.loadPage) {
+                window.parent.loadPage(url);
+            } else if (window.parent && window.parent.document.getElementById('mainIframe')) {
+                window.parent.document.getElementById('mainIframe').src = url;
+            } else {
+                window.location.href = url;
+            }
+        }
+    </script>
+</body>
+</html>

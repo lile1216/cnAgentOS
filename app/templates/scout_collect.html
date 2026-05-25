@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>数据采集 - cnAgentOS管理系统</title>
+    <link rel="stylesheet" href="/static/dist/layui-v2.13.6/layui/css/layui.css">
+    <style>
+        body { margin: 0; padding: 0; background: #f5f5f5; }
+        .layui-layout-admin .layui-header { background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); box-shadow: 0 2px 10px rgba(0,0,0,0.15); }
+        .layui-header .layui-logo { color: white; font-size: 18px; font-weight: 600; padding: 0 30px; }
+        .layui-nav-item a { color: white !important; }
+        .layui-nav-item:hover { background: rgba(255,255,255,0.1); }
+        .layui-side { background: #2f4050; width: 200px; }
+        .layui-side-scroll { width: 220px; }
+        .layui-nav-tree .layui-nav-item a { color: #a7b1c2; height: 45px; line-height: 45px; padding-left: 25px; }
+        .layui-nav-tree .layui-nav-item a:hover { color: white; background: #293846; }
+        .layui-nav-tree .layui-nav-item.layui-nav-itemed>a { background: #1ab394 !important; color: white; }
+        .layui-body { background: #f3f3f4; left: 200px; padding: 20px; }
+        .user-avatar { width: 32px; height: 32px; border-radius: 50%; background: rgba(255,255,255,0.2); display: inline-block; line-height: 32px; text-align: center; margin-right: 8px; font-size: 14px; }
+        .page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .page-title { font-size: 20px; font-weight: 600; color: #676a6c; }
+        .form-container { background: white; border-radius: 8px; box-shadow: 0 2px 12px 0 rgba(0,0,0,0.08); padding: 30px; max-width: 800px; margin: 0 auto; }
+        .result-container { margin-top: 20px; background: white; border-radius: 8px; box-shadow: 0 2px 12px 0 rgba(0,0,0,0.08); padding: 20px; display: none; }
+        .result-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding-bottom: 15px; border-bottom: 1px solid #eee; }
+        .result-title { font-size: 18px; font-weight: 600; color: #676a6c; }
+        .result-status { padding: 5px 15px; border-radius: 20px; font-size: 13px; font-weight: 500; }
+        .result-status.success { background: rgba(46, 213, 115, 0.2); color: #2ed573; }
+        .result-status.error { background: rgba(255, 107, 107, 0.2); color: #ff6b6b; }
+        .result-info { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-bottom: 20px; }
+        .info-item { background: #f9f9f9; border-radius: 8px; padding: 15px; }
+        .info-label { color: #888; font-size: 12px; margin-bottom: 5px; }
+        .info-value { color: #333; font-size: 14px; font-family: 'Consolas', monospace; word-break: break-all; }
+        .code-preview { background: #1a1a2e; border: 1px solid #eee; border-radius: 8px; padding: 20px; overflow-x: auto; max-height: 400px; overflow-y: auto; }
+        .code-preview pre { margin: 0; color: #8892b0; font-family: 'Consolas', monospace; font-size: 13px; white-space: pre-wrap; word-break: break-all; }
+        .loading-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); display: none; justify-content: center; align-items: center; z-index: 9999; }
+        .loading-content { text-align: center; color: #fff; }
+        .loading-spinner { width: 50px; height: 50px; border: 3px solid rgba(0, 212, 255, 0.3); border-top-color: #00d4ff; border-radius: 50%; animation: spin 1s linear infinite; margin: 0 auto 20px; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
+</head>
+<body class="layui-layout-body">
+    <div class="layui-layout layui-layout-admin">
+        <!-- 头部 -->
+        <div class="layui-header">
+            <div class="layui-logo"><i class="layui-icon layui-icon-laptop"></i> cnAgentOS 管理系统</div>
+            <ul class="layui-nav layui-layout-right">
+                <li class="layui-nav-item"><a href="javascript:void(0)" id="refreshBtn"><i class="layui-icon layui-icon-refresh"></i> 刷新</a></li>
+                <li class="layui-nav-item"><a href="javascript:void(0)" id="fullscreenBtn"><i class="layui-icon layui-icon-screen-full"></i> 全屏</a></li>
+                <li class="layui-nav-item"><a href="javascript:void(0)" id="userMenu"><span class="user-avatar">{{ current_user[:1].upper() }}</span> {{ current_user }}</a></li>
+                <li class="layui-nav-item"><a href="/auth/logout" id="logoutBtn"><i class="layui-icon layui-icon-power"></i> 退出</a></li>
+            </ul>
+        </div>
+        
+        <!-- 侧边栏 -->
+        <div class="layui-side layui-bg-black">
+            <div class="layui-side-scroll">
+                <ul class="layui-nav layui-nav-tree" lay-filter="sideMenu">
+                    <li class="layui-nav-item">
+                        <a href="javascript:void(0)"><i class="layui-icon layui-icon-dashboard"></i> 系统管理</a>
+                        <dl class="layui-nav-child">
+                            <dd><a href="/admin/users">用户管理</a></dd>
+                            <dd><a href="/admin/roles">角色管理</a></dd>
+                            <dd><a href="/admin/permissions">权限管理</a></dd>
+                        </dl>
+                    </li>
+                    <li class="layui-nav-item">
+                        <a href="javascript:void(0)"><i class="layui-icon layui-icon-set"></i> 功能管理</a>
+                        <dl class="layui-nav-child">
+                            <dd><a href="/admin/functions">功能列表</a></dd>
+                            <dd><a href="/admin/modules">模块管理</a></dd>
+                        </dl>
+                    </li>
+                    <li class="layui-nav-item"><a href="javascript:void(0)"><i class="layui-icon layui-icon-server"></i> 模型引擎</a>
+                        <dl class="layui-nav-child"><dd><a href="/admin/models">模型管理</a></dd></dl>
+                    </li>
+                    <li class="layui-nav-item"><a href="javascript:void(0)"><i class="layui-icon layui-icon-user"></i> 数字员工</a>
+                        <dl class="layui-nav-child">
+                            <dd><a href="/admin/employees">员工管理</a></dd>
+                        </dl>
+                    </li>
+                    <li class="layui-nav-item layui-nav-itemed">
+                        <a href="javascript:void(0)"><i class="layui-icon layui-icon-search"></i> 瞭望管理</a>
+                        <dl class="layui-nav-child">
+                            <dd><a href="/admin/scout">瞭望源管理</a></dd>
+                            <dd><a href="/admin/scout/collect">数据采集</a></dd>
+                        </dl>
+                    </li>
+                    <li class="layui-nav-item">
+                        <a href="javascript:void(0)"><i class="layui-icon layui-icon-link"></i> 接口管理</a>
+                        <dl class="layui-nav-child">
+                            <dd><a href="/admin/interfaces">接口列表</a></dd>
+                        </dl>
+                    </li>
+                    <li class="layui-nav-item"><a href="/admin"><i class="layui-icon layui-icon-home"></i> 返回首页</a></li>
+                </ul>
+            </div>
+        </div>
+        
+        <!-- 主体内容 -->
+        <div class="layui-body">
+            <div class="page-header">
+                <h2 class="page-title">数据采集</h2>
+            </div>
+
+            <div class="form-container">
+                <form class="layui-form" id="collectForm">
+                    <input type="hidden" name="source_id" id="sourceId" value="{{ source_info.id if source_info else '' }}">
+                    <input type="hidden" id="xsrf_token" value="{{ xsrf_token }}">
+                    
+                    <div class="layui-form-item">
+                        <label class="layui-form-label">选择数据源</label>
+                        <div class="layui-input-block">
+                            <select name="source_id" id="sourceSelect" lay-verify="required" class="layui-select">
+                                <option value="">请选择数据源</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="layui-form-item">
+                        <label class="layui-form-label">采集关键字</label>
+                        <div class="layui-input-block">
+                            <input type="text" name="keywords" id="keywords" placeholder="输入采集关键字（如URL包含{关键字}占位符则必填）" class="layui-input">
+                        </div>
+                    </div>
+
+                    <div class="layui-form-item">
+                        <label class="layui-form-label">请求方法</label>
+                        <div class="layui-input-block">
+                            <input type="text" name="method" id="method" readonly class="layui-input" style="color: #888;">
+                        </div>
+                    </div>
+
+                    <div class="layui-form-item">
+                        <label class="layui-form-label">目标URL</label>
+                        <div class="layui-input-block">
+                            <input type="text" name="url" id="url" readonly class="layui-input" style="color: #888;">
+                        </div>
+                    </div>
+
+                    <div class="layui-form-item">
+                        <label class="layui-form-label">请求头</label>
+                        <div class="layui-input-block">
+                            <textarea name="headers" id="headers" readonly class="layui-textarea" style="color: #888; height: 150px;"></textarea>
+                        </div>
+                    </div>
+
+                    <div class="layui-form-item" style="text-align: center;">
+                        <button type="button" class="layui-btn layui-btn-normal" id="resetBtn">重置</button>
+                        <button type="button" class="layui-btn" id="collectBtn">开始采集</button>
+                    </div>
+                </form>
+            </div>
+
+            <div class="result-container" id="resultContainer">
+                <div class="result-header">
+                    <div class="result-title">采集结果</div>
+                    <div class="result-status" id="resultStatus"></div>
+                </div>
+                
+                <div class="result-info">
+                    <div class="info-item">
+                        <div class="info-label">HTTP状态码</div>
+                        <div class="info-value" id="statusCode">-</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">请求URL</div>
+                        <div class="info-value" id="requestUrl">-</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">响应大小</div>
+                        <div class="info-value" id="contentLength">-</div>
+                    </div>
+                </div>
+
+                <div>
+                    <div style="color: #888; font-size: 13px; margin-bottom: 10px;">响应内容</div>
+                    <div class="code-preview">
+                        <pre id="responseContent"></pre>
+                    </div>
+                </div>
+            </div>
+
+            <div class="loading-overlay" id="loadingOverlay">
+                <div class="loading-content">
+                    <div class="loading-spinner"></div>
+                    <div>正在采集数据...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/dist/layui-v2.13.6/layui/layui.js"></script>
+    <script>
+        layui.use(['form', 'layer'], function() {
+            var form = layui.form;
+            var layer = layui.layer;
+            var $ = layui.$;
+
+            var sourceInfo = {{ source_info | tojson if source_info else 'null' }};
+
+            loadSources();
+
+            function loadSources() {
+                $.ajax({
+                    url: '/api/scout',
+                    type: 'get',
+                    data: { page: 1, limit: 100 },
+                    success: function(res) {
+                        if (res.code === 0) {
+                            var options = '<option value="">请选择数据源</option>';
+                            res.data.forEach(function(source) {
+                                if (source.enabled == 1) {
+                                    var selected = sourceInfo && source.id == sourceInfo.id ? 'selected' : '';
+                                    options += '<option value="' + source.id + '" ' + selected + '>' + source.name + '</option>';
+                                }
+                            });
+                            $('#sourceSelect').html(options);
+                            form.render('select');
+                            
+                            if (sourceInfo) {
+                                updateSourceInfo(sourceInfo);
+                            }
+                        }
+                    }
+                });
+            }
+
+            $('#sourceSelect').change(function() {
+                var id = $(this).val();
+                if (id) {
+                    $.ajax({
+                        url: '/api/scout',
+                        type: 'get',
+                        data: { page: 1, limit: 100 },
+                        success: function(res) {
+                            if (res.code === 0) {
+                                var source = res.data.find(function(item) { return item.id == id; });
+                                if (source) {
+                                    updateSourceInfo(source);
+                                }
+                            }
+                        }
+                    });
+                } else {
+                    $('#method').val('');
+                    $('#url').val('');
+                    $('#headers').val('');
+                }
+            });
+
+            function updateSourceInfo(source) {
+                $('#sourceId').val(source.id);
+                $('#method').val(source.request_method);
+                $('#url').val(source.url_pattern);
+                $('#headers').val(source.headers || '');
+            }
+
+            $('#resetBtn').click(function() {
+                $('#keywords').val('');
+                $('#resultContainer').hide();
+            });
+
+            $('#collectBtn').click(function() {
+                var sourceId = $('#sourceSelect').val();
+                var keywords = $('#keywords').val();
+                
+                if (!sourceId) {
+                    layer.msg('请选择数据源', {icon: 2});
+                    return;
+                }
+
+                var urlPattern = $('#url').val();
+                if (urlPattern.includes('{关键字}') && !keywords) {
+                    layer.msg('URL包含关键字占位符，请输入关键字', {icon: 2});
+                    return;
+                }
+
+                $('#loadingOverlay').show();
+                $('#resultContainer').hide();
+
+                $.ajax({
+                    url: '/api/scout',
+                    type: 'post',
+                    data: {
+                        action: 'collect',
+                        id: sourceId,
+                        keywords: keywords,
+                        _xsrf: document.getElementById('xsrf_token').value
+                    },
+                    success: function(res) {
+                        $('#loadingOverlay').hide();
+                        
+                        if (res.code === 0) {
+                            $('#resultStatus').removeClass('error').addClass('success').text('采集成功');
+                            $('#statusCode').text(res.data.status_code);
+                            $('#requestUrl').text(res.data.url);
+                            $('#contentLength').text(res.data.content_length + ' 字符');
+                            $('#responseContent').text(res.data.content);
+                            $('#resultContainer').show();
+                        } else {
+                            $('#resultStatus').removeClass('success').addClass('error').text('采集失败');
+                            $('#statusCode').text('-');
+                            $('#requestUrl').text('-');
+                            $('#contentLength').text('-');
+                            $('#responseContent').text(res.msg);
+                            $('#resultContainer').show();
+                        }
+                    },
+                    error: function() {
+                        $('#loadingOverlay').hide();
+                        layer.msg('采集失败', {icon: 2});
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>

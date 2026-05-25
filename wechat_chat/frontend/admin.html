@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>后台管理 - 智能聊天子系统</title>
+    <link rel="stylesheet" href="/static/layui/css/layui.css">
+    <style>
+        body { padding: 20px; background: #f2f2f2; }
+        .admin-card { background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); min-height: 500px; }
+        .tab-content { padding-top: 20px; }
+        .tool-bar { margin-bottom: 15px; }
+    </style>
+</head>
+<body>
+    <div class="admin-card">
+        <div style="margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center;">
+            <h2 style="font-weight: bold;">子系统后台管理</h2>
+            <a href="/wechat-chat/home" class="layui-btn layui-btn-primary layui-btn-sm">返回前台</a>
+        </div>
+
+        <div class="layui-tab layui-tab-brief" lay-filter="adminTab">
+            <ul class="layui-tab-title">
+                <li class="layui-this" lay-id="groups">群组管理</li>
+                <li lay-id="files">文件管理</li>
+                <li lay-id="servers">服务器管理</li>
+                <li lay-id="ai-tools">AI工具绑定</li>
+            </ul>
+            <div class="layui-tab-content tab-content">
+                <!-- 群组管理 -->
+                <div class="layui-tab-item layui-show">
+                    <table id="groupTable" lay-filter="groupTable"></table>
+                </div>
+                <!-- 文件管理 -->
+                <div class="layui-tab-item">
+                    <div class="tool-bar">
+                        <button class="layui-btn layui-btn-sm" id="refreshFiles">刷新列表</button>
+                    </div>
+                    <table id="fileTable" lay-filter="fileTable"></table>
+                </div>
+                <!-- 服务器管理 -->
+                <div class="layui-tab-item">
+                    <div class="tool-bar">
+                        <button class="layui-btn layui-btn-sm" id="addServer">添加服务器</button>
+                    </div>
+                    <table id="serverTable" lay-filter="serverTable"></table>
+                </div>
+                <!-- AI工具管理 -->
+                <div class="layui-tab-item">
+                    <div class="tool-bar">
+                        <button class="layui-btn layui-btn-sm" id="addTool">新增AI工具</button>
+                        <button class="layui-btn layui-btn-sm layui-btn-normal" id="bindTool">绑定员工</button>
+                    </div>
+                    <div class="layui-row layui-col-space15">
+                        <div class="layui-col-md6">
+                            <fieldset class="layui-elem-field layui-field-title"><legend>工具列表</legend></fieldset>
+                            <table id="toolTable" lay-filter="toolTable"></table>
+                        </div>
+                        <div class="layui-col-md6">
+                            <fieldset class="layui-elem-field layui-field-title"><legend>绑定关系</legend></fieldset>
+                            <table id="bindingTable" lay-filter="bindingTable"></table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 表格操作模板 -->
+    <script type="text/html" id="groupBar">
+        <a class="layui-btn layui-btn-xs" lay-event="announce">发公告</a>
+        <a class="layui-btn layui-btn-warm layui-btn-xs" lay-event="mute">禁言/解禁</a>
+        <a class="layui-btn layui-btn-danger layui-btn-xs" lay-event="dissolve">解散</a>
+    </script>
+
+    <script src="/static/layui/layui.js"></script>
+    <script>
+    layui.use(['table', 'element', 'layer', 'form'], function(){
+        var table = layui.table;
+        var element = layui.element;
+        var layer = layui.layer;
+        var form = layui.form;
+        var $ = layui.$;
+
+        // 1. 群组管理
+        table.render({
+            elem: '#groupTable',
+            url: '/wechat-chat/api/admin/groups',
+            cols: [[
+                {field:'id', title:'ID', width:60},
+                {field:'name', title:'群名称', width:150},
+                {field:'owner_name', title:'创建者', width:120},
+                {field:'announcement', title:'当前公告'},
+                {field:'status', title:'状态', width:80, templet: function(d){ return d.status === 1 ? '正常' : '已解散'; }},
+                {field:'is_muted', title:'禁言', width:80, templet: function(d){ return d.is_muted === 1 ? '是' : '否'; }},
+                {fixed: 'right', title:'操作', toolbar: '#groupBar', width:220}
+            ]],
+            parseData: function(res){ return { "code": res.code, "msg": res.msg, "data": res.data }; }
+        });
+
+        table.on('tool(groupTable)', function(obj){
+            var data = obj.data;
+            if(obj.event === 'announce'){
+                layer.prompt({title: '输入群公告内容', formType: 2}, function(val, index){
+                    $.ajax({
+                        url: '/wechat-chat/api/admin/groups',
+                        type: 'POST',
+                        contentType: 'application/json',
+                        data: JSON.stringify({action: 'announce', group_id: data.id, content: val}),
+                        success: function(){ layer.close(index); table.reload('groupTable'); }
+                    });
+                });
+            } else if(obj.event === 'mute'){
+                var newStatus = data.is_muted === 1 ? 0 : 1;
+                $.ajax({
+                    url: '/wechat-chat/api/admin/groups',
+                    type: 'POST',
+                    contentType: 'application/json',
+                    data: JSON.stringify({action: 'mute', group_id: data.id, status: newStatus}),
+                    success: function(){ table.reload('groupTable'); }
+                });
+            } else if(obj.event === 'dissolve'){
+                layer.confirm('确认解散该群聊吗？', function(index){
+                    $.ajax({
+                        url: '/wechat-chat/api/admin/groups',
+                        type: 'POST',
+                        contentType: 'application/json',
+                        data: JSON.stringify({action: 'dissolve', group_id: data.id}),
+                        success: function(){ layer.close(index); table.reload('groupTable'); }
+                    });
+                });
+            }
+        });
+
+        // 2. 文件管理
+        table.render({
+            elem: '#fileTable',
+            url: '/wechat-chat/api/admin/files',
+            cols: [[
+                {field:'id', title:'ID', width:60},
+                {field:'original_name', title:'文件名', width:200},
+                {field:'md5', title:'MD5', width:280},
+                {field:'file_size', title:'大小(B)', width:100},
+                {field:'create_at', title:'上传时间', width:180},
+                {fixed: 'right', title:'操作', width:120, templet: function(d){
+                    return '<a class="layui-btn layui-btn-xs" href="'+d.file_path+'" target="_blank">下载</a>' +
+                           '<button class="layui-btn layui-btn-danger layui-btn-xs" onclick="deleteFile('+d.id+')">删除</button>';
+                }}
+            ]],
+            parseData: function(res){ return { "code": res.code, "msg": res.msg, "data": res.data }; }
+        });
+
+        window.deleteFile = function(id){
+            layer.confirm('确认删除文件记录吗？', function(index){
+                $.ajax({
+                    url: '/wechat-chat/api/admin/files?id=' + id,
+                    type: 'DELETE',
+                    success: function(){ layer.close(index); table.reload('fileTable'); }
+                });
+            });
+        };
+
+        // 3. 服务器管理 (略，同理)
+        table.render({
+            elem: '#serverTable',
+            url: '/wechat-chat/api/admin/servers',
+            cols: [[
+                {field:'id', title:'ID', width:60},
+                {field:'name', title:'服务器名', width:150},
+                {field:'host', title:'Host', width:150},
+                {field:'port', title:'Port', width:80},
+                {field:'status', title:'状态', width:100, templet: function(d){ return d.status === 1 ? '运行中' : '禁用'; }}
+            ]],
+            parseData: function(res){ return { "code": res.code, "msg": res.msg, "data": res.data }; }
+        });
+
+        // 4. AI工具绑定
+        function loadAITools(){
+            $.get('/wechat-chat/api/admin/ai-tools', function(res){
+                table.render({ elem: '#toolTable', data: res.data.tools, cols: [[
+                    {field:'id', title:'ID', width:60},
+                    {field:'name', title:'工具名', width:150},
+                    {field:'tool_type', title:'类型', width:100}
+                ]]});
+                table.render({ elem: '#bindingTable', data: res.data.bindings, cols: [[
+                    {field:'employee_name', title:'数字员工', width:150},
+                    {field:'tool_name', title:'绑定工具', width:150},
+                    {field:'create_at', title:'绑定时间'}
+                ]]});
+            });
+        }
+        loadAITools();
+
+        $('#addTool').click(function(){
+            layer.prompt({title: '输入工具名|类型|配置JSON'}, function(val, index){
+                var parts = val.split('|');
+                $.ajax({
+                    url: '/wechat-chat/api/admin/ai-tools',
+                    type: 'POST',
+                    contentType: 'application/json',
+                    data: JSON.stringify({action: 'add_tool', name: parts[0], type: parts[1] || 'api', config: parts[2] || '{}'}),
+                    success: function(){ layer.close(index); loadAITools(); }
+                });
+            });
+        });
+
+        $('#bindTool').click(function(){
+            layer.prompt({title: '员工ID|工具ID'}, function(val, index){
+                var parts = val.split('|');
+                $.ajax({
+                    url: '/wechat-chat/api/admin/ai-tools',
+                    type: 'POST',
+                    contentType: 'application/json',
+                    data: JSON.stringify({action: 'bind', employee_id: parts[0], tool_id: parts[1]}),
+                    success: function(){ layer.close(index); loadAITools(); }
+                });
+            });
+        });
+
+    });
+    </script>
+</body>
+</html>

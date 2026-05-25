@@ -1,0 +1,556 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>智能舆情 - cnAgentOS</title>
+    <link rel="stylesheet" href="/static/dist/layui-v2.13.6/layui/css/layui.css">
+    <link rel="stylesheet" href="/static/dist/fontawesome-free-5.15.4-web/css/all.min.css">
+    <script src="/static/dist/jquery-3.6.0/jquery.min.js"></script>
+    <style>
+        body { background: #0a0e17; color: #c4c9d4; }
+        .sentiment-container { padding: 20px; max-width: 1600px; margin: 0 auto; }
+        .page-header { text-align: center; margin-bottom: 30px; }
+        .page-title { font-size: 28px; font-weight: 600; color: #00d4ff; text-shadow: 0 0 20px rgba(0,212,255,0.5); }
+        .search-box {
+            background: linear-gradient(135deg, #1a1f35 0%, #141824 100%);
+            border: 1px solid #2a3146;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .layui-form-item { margin-bottom: 10px; }
+        .layui-form-label { color: #8b949e; width: 100px; }
+        .stat-cards {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        .stat-card {
+            background: linear-gradient(135deg, #1a1f35 0%, #141824 100%);
+            border: 1px solid #2a3146;
+            border-radius: 10px;
+            padding: 20px;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+        .stat-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+        }
+        .stat-card.positive::before { background: linear-gradient(90deg, #52c41a, #73d13d); }
+        .stat-card.negative::before { background: linear-gradient(90deg, #ff4d4f, #ff7875); }
+        .stat-card.neutral::before { background: linear-gradient(90deg, #1890ff, #69c0ff); }
+        .stat-card.total::before { background: linear-gradient(90deg, #722ed1, #b37feb); }
+        .stat-card.risk::before { background: linear-gradient(90deg, #faad14, #ffd666); }
+        .stat-value { font-size: 32px; font-weight: bold; margin: 10px 0; }
+        .stat-card.positive .stat-value { color: #52c41a; }
+        .stat-card.negative .stat-value { color: #ff4d4f; }
+        .stat-card.neutral .stat-value { color: #1890ff; }
+        .stat-card.total .stat-value { color: #722ed1; }
+        .stat-card.risk .stat-value { color: #faad14; }
+        .stat-label { font-size: 14px; color: #8b949e; }
+        .data-table {
+            background: linear-gradient(135deg, #1a1f35 0%, #141824 100%);
+            border: 1px solid #2a3146;
+            border-radius: 12px;
+            overflow: hidden;
+        }
+        .layui-table-view { background: transparent; }
+        .layui-table th { background: #1e2436; color: #8b949e; }
+        .layui-table tr { background: #141824; color: #c4c9d4; }
+        .layui-table tr:hover { background: #1a1f35; }
+        .sentiment-tag {
+            padding: 3px 10px;
+            border-radius: 4px;
+            font-size: 12px;
+        }
+        .sentiment-positive { background: rgba(82, 196, 26, 0.2); color: #52c41a; }
+        .sentiment-negative { background: rgba(255, 77, 79, 0.2); color: #ff4d4f; }
+        .sentiment-neutral { background: rgba(24, 144, 255, 0.2); color: #1890ff; }
+        .risk-low { color: #52c41a; }
+        .risk-medium { color: #faad14; }
+        .risk-high { color: #ff4d4f; }
+        .btn-analyze {
+            background: linear-gradient(135deg, #1890ff, #69c0ff);
+            border: none;
+            color: white;
+        }
+        .btn-export {
+            background: linear-gradient(135deg, #722ed1, #b37feb);
+            border: none;
+            color: white;
+        }
+        .layui-btn { border-radius: 6px; }
+        .layui-btn-normal { background: #1890ff; }
+        .chart-row {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        .chart-card {
+            background: linear-gradient(135deg, #1a1f35 0%, #141824 100%);
+            border: 1px solid #2a3146;
+            border-radius: 12px;
+            padding: 15px;
+        }
+        .chart-title {
+            font-size: 16px;
+            color: #00d4ff;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #2a3146;
+        }
+        .no-data { text-align: center; padding: 40px; color: #8b949e; }
+    </style>
+</head>
+<body>
+    <div class="sentiment-container">
+        <div class="page-header">
+            <h1 class="page-title"><i class="fas fa-brain"></i> 智能舆情分析</h1>
+        </div>
+
+        <div class="stat-cards">
+            <div class="stat-card total">
+                <div class="stat-label">舆情总量</div>
+                <div class="stat-value" id="totalCount">0</div>
+            </div>
+            <div class="stat-card positive">
+                <div class="stat-label">正面舆情</div>
+                <div class="stat-value" id="positiveCount">0</div>
+            </div>
+            <div class="stat-card negative">
+                <div class="stat-label">负面舆情</div>
+                <div class="stat-value" id="negativeCount">0</div>
+            </div>
+            <div class="stat-card neutral">
+                <div class="stat-label">中性舆情</div>
+                <div class="stat-value" id="neutralCount">0</div>
+            </div>
+            <div class="stat-card risk">
+                <div class="stat-label">高风险</div>
+                <div class="stat-value" id="highRiskCount">0</div>
+            </div>
+        </div>
+
+        <div class="chart-row">
+            <div class="chart-card">
+                <div class="chart-title"><i class="fas fa-chart-pie"></i> 情感分布</div>
+                <div id="sentimentChart" style="height: 250px;"></div>
+            </div>
+            <div class="chart-card">
+                <div class="chart-title"><i class="fas fa-chart-line"></i> 舆情趋势</div>
+                <div id="timelineChart" style="height: 250px;"></div>
+            </div>
+            <div class="chart-card">
+                <div class="chart-title"><i class="fas fa-chart-bar"></i> 来源分布</div>
+                <div id="sourceChart" style="height: 250px;"></div>
+            </div>
+            <div class="chart-card">
+                <div class="chart-title"><i class="fas fa-cloud"></i> 热词TOP20</div>
+                <div id="hotwordsChart" style="height: 250px;"></div>
+            </div>
+        </div>
+
+        <div class="search-box">
+            <div class="layui-form layui-form-pane">
+                <div class="layui-form-item">
+                    <div class="layui-inline">
+                        <label class="layui-form-label">时间范围</label>
+                        <div class="layui-input-inline" style="width: 150px;">
+                            <select name="days" id="daysSelect" lay-filter="daysSelect">
+                                <option value="1">最近1天</option>
+                                <option value="7" selected>最近7天</option>
+                                <option value="30">最近30天</option>
+                                <option value="90">最近90天</option>
+                            </select>
+                        </div>
+                        <div class="layui-input-inline" style="width: 150px;">
+                            <select name="sentiment" id="sentimentSelect">
+                                <option value="">全部情感</option>
+                                <option value="positive">正面</option>
+                                <option value="negative">负面</option>
+                                <option value="neutral">中性</option>
+                            </select>
+                        </div>
+                        <div class="layui-input-inline" style="width: 150px;">
+                            <select name="sourceType" id="sourceTypeSelect">
+                                <option value="">全部来源</option>
+                                <option value="scout">瞭望采集</option>
+                                <option value="chat">智能问答</option>
+                            </select>
+                        </div>
+                        <div class="layui-input-inline" style="width: 150px;">
+                            <select name="riskLevel" id="riskLevelSelect">
+                                <option value="">全部风险</option>
+                                <option value="low">低风险</option>
+                                <option value="medium">中风险</option>
+                                <option value="high">高风险</option>
+                            </select>
+                        </div>
+                        <div class="layui-input-inline" style="width: 200px;">
+                            <input type="text" name="keyword" id="keywordInput" class="layui-input" placeholder="关键词搜索">
+                        </div>
+                        <button class="layui-btn" type="button" id="searchBtn">
+                            <i class="layui-icon layui-icon-search"></i> 查询
+                        </button>
+                        <button class="layui-btn layui-btn-normal" type="button" id="analyzeBtn">
+                            <i class="fas fa-brain"></i> AI分析
+                        </button>
+                        <button class="layui-btn layui-btn-warm btn-export" type="button" id="exportBtn">
+                            <i class="fas fa-download"></i> 导出
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="data-table">
+            <table class="layui-table" lay-filter="sentimentTable" lay-data="{id:'sentimentTable',page:true,limit:20}">
+                <thead>
+                    <tr>
+                        <th lay-data="{field:'id',width:60,sort:true}">ID</th>
+                        <th lay-data="{field:'source_type',width:100}">来源</th>
+                        <th lay-data="{field:'title',width:200}">标题</th>
+                        <th lay-data="{field:'content',minWidth:200}">内容摘要</th>
+                        <th lay-data="{field:'sentiment',width:90}">情感</th>
+                        <th lay-data="{field:'sentiment_score',width:90}">得分</th>
+                        <th lay-data="{field:'confidence',width:80}">置信度</th>
+                        <th lay-data="{field:'keywords',width:150}">关键词</th>
+                        <th lay-data="{field:'risk_level',width:80}">风险</th>
+                        <th lay-data="{field:'hot_score',width:80,sort:true}">热度</th>
+                        <th lay-data="{field:'analyze_time',width:160,sort:true}">分析时间</th>
+                        <th lay-data="{field:'actions',width:120,fixed:'right'}">操作</th>
+                    </tr>
+                </thead>
+                <tbody id="tableBody">
+                </tbody>
+            </table>
+            <div id="pageContainer"></div>
+        </div>
+    </div>
+
+    <script src="/static/dist/layui-v2.13.6/layui/layui.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/echarts-wordcloud@2.1.0/dist/echarts-wordcloud.min.js"></script>
+    <script>
+        layui.use(['table', 'form', 'layer', 'laydate'], function(){
+            var table = layui.table;
+            var form = layui.form;
+            var layer = layui.layer;
+            var laydate = layui.laydate;
+
+            var currentPage = 1;
+            var pageSize = 20;
+            var sentimentChart, timelineChart, sourceChart, hotwordsChart;
+
+            function initCharts() {
+                sentimentChart = echarts.init(document.getElementById('sentimentChart'));
+                timelineChart = echarts.init(document.getElementById('timelineChart'));
+                sourceChart = echarts.init(document.getElementById('sourceChart'));
+                hotwordsChart = echarts.init(document.getElementById('hotwordsChart'));
+
+                window.addEventListener('resize', function() {
+                    sentimentChart.resize();
+                    timelineChart.resize();
+                    sourceChart.resize();
+                    hotwordsChart.resize();
+                });
+            }
+
+            function loadStats() {
+                var days = $('#daysSelect').val();
+                $.get('/api/sentiment/stats?type=all&days=' + days + '&cache=false')
+                    .done(function(res){
+                        if (res.code === 0) {
+                            var data = res.data;
+                            var stats = data.stats;
+
+                            $('#totalCount').text(stats.total || 0);
+                            var sentimentMap = {};
+                            (stats.by_sentiment || []).forEach(function(item){
+                                sentimentMap[item.sentiment] = item.count;
+                            });
+                            $('#positiveCount').text(sentimentMap['positive'] || 0);
+                            $('#negativeCount').text(sentimentMap['negative'] || 0);
+                            $('#neutralCount').text(sentimentMap['neutral'] || 0);
+
+                            var highRisk = 0;
+                            (stats.by_risk || []).forEach(function(item){
+                                if (item.risk_level === 'high') highRisk = item.count;
+                            });
+                            $('#highRiskCount').text(highRisk);
+
+                            renderSentimentChart(stats.by_sentiment || []);
+                            renderTimelineChart(data.timeline || []);
+                            renderSourceChart(stats.by_source || []);
+                            renderHotwordsChart(data.hotwords || []);
+                        } else {
+                            console.error('API返回错误:', res.msg);
+                        }
+                    })
+                    .fail(function(xhr, status, error){
+                        console.error('加载统计数据失败:', error);
+                        layer.msg('加载统计数据失败，请检查网络连接', {icon: 2});
+                    });
+            }
+
+            function renderSentimentChart(data) {
+                var option = {
+                    tooltip: {trigger: 'item'},
+                    legend: {bottom: 10, left: 'center', textStyle: {color: '#c4c9d4'}},
+                    series: [{
+                        type: 'pie',
+                        radius: ['40%', '70%'],
+                        avoidLabelOverlap: false,
+                        itemStyle: {borderRadius: 10, borderColor: '#0a0e17', borderWidth: 2},
+                        label: {show: true, formatter: '{b}: {c} ({d}%)', color: '#c4c9d4'},
+                        data: data.map(function(item){
+                            return {
+                                value: item.count,
+                                name: item.sentiment === 'positive' ? '正面' : item.sentiment === 'negative' ? '负面' : '中性',
+                                itemStyle: {
+                                    color: item.sentiment === 'positive' ? '#52c41a' : item.sentiment === 'negative' ? '#ff4d4f' : '#1890ff'
+                                }
+                            };
+                        })
+                    }]
+                };
+                sentimentChart.setOption(option);
+            }
+
+            function renderTimelineChart(data) {
+                var option = {
+                    tooltip: {trigger: 'axis'},
+                    legend: {data: ['总量', '正面', '负面', '中性'], bottom: 10, textStyle: {color: '#c4c9d4'}},
+                    grid: {left: '3%', right: '4%', bottom: '15%', containLabel: true},
+                    xAxis: {type: 'category', boundaryGap: false, data: data.map(function(d){return d.time_bucket;}), axisLine: {lineStyle: {color: '#2a3146'}}, axisLabel: {color: '#8b949e'}},
+                    yAxis: {type: 'value', axisLine: {lineStyle: {color: '#2a3146'}}, axisLabel: {color: '#8b949e'}, splitLine: {lineStyle: {color: '#1e2436'}}},
+                    series: [
+                        {name: '总量', type: 'bar', data: data.map(function(d){return d.total_count;}), itemStyle: {color: '#1890ff'}},
+                        {name: '正面', type: 'line', smooth: true, data: data.map(function(d){return d.positive_count || 0;}), itemStyle: {color: '#52c41a'}},
+                        {name: '负面', type: 'line', smooth: true, data: data.map(function(d){return d.negative_count || 0;}), itemStyle: {color: '#ff4d4f'}},
+                        {name: '中性', type: 'line', smooth: true, data: data.map(function(d){return d.neutral_count || 0;}), itemStyle: {color: '#faad14'}}
+                    ]
+                };
+                timelineChart.setOption(option);
+            }
+
+            function renderSourceChart(data) {
+                var option = {
+                    tooltip: {trigger: 'item'},
+                    legend: {bottom: 10, left: 'center', textStyle: {color: '#c4c9d4'}},
+                    series: [{
+                        type: 'pie',
+                        radius: '65%',
+                        label: {show: true, formatter: '{b}: {c}', color: '#c4c9d4'},
+                        data: data.map(function(item){
+                            var name = item.source_type === 'scout' ? '瞭望采集' : item.source_type === 'news' ? '新闻' : '智能问答';
+                            var color = item.source_type === 'scout' ? '#1890ff' : item.source_type === 'news' ? '#52c41a' : '#722ed1';
+                            return {
+                                value: item.count,
+                                name: name,
+                                itemStyle: {color: color}
+                            };
+                        })
+                    }]
+                };
+                sourceChart.setOption(option);
+            }
+
+            function renderHotwordsChart(data) {
+                var option = {
+                    tooltip: {show: true},
+                    series: [{
+                        type: 'wordCloud',
+                        shape: 'circle',
+                        left: 'center',
+                        top: 'center',
+                        width: '90%',
+                        height: '80%',
+                        sizeRange: [14, 50],
+                        rotationRange: [-45, 45],
+                        rotationStep: 15,
+                        gridSize: 8,
+                        drawOutOfBound: false,
+                        textStyle: {fontFamily: 'sans-serif', fontWeight: 'bold', color: function(){return 'rgb(' + [Math.round(Math.random()*200+50), Math.round(Math.random()*50), Math.round(Math.random()*200+50)].join(',') + ')';}},
+                        data: data.map(function(item){return {name: item.keyword, value: item.count};})
+                    }]
+                };
+                hotwordsChart.setOption(option);
+            }
+
+            function loadTableData(page) {
+                currentPage = page || 1;
+                var days = $('#daysSelect').val();
+                var sentiment = $('#sentimentSelect').val();
+                var sourceType = $('#sourceTypeSelect').val();
+                var riskLevel = $('#riskLevelSelect').val();
+                var keyword = $('#keywordInput').val();
+
+                var params = 'page=' + currentPage + '&limit=' + pageSize;
+                if (days) params += '&days=' + days;
+                if (sentiment) params += '&sentiment=' + sentiment;
+                if (sourceType) params += '&source_type=' + sourceType;
+                if (riskLevel) params += '&risk_level=' + riskLevel;
+                if (keyword) params += '&keyword=' + encodeURIComponent(keyword);
+
+                $.get('/api/sentiment?' + params)
+                    .done(function(res){
+                        if (res.code === 0) {
+                            renderTable(res.data || []);
+                            renderPagination(res.count, currentPage);
+                        } else {
+                            console.error('API返回错误:', res.msg);
+                            renderTable([]);
+                        }
+                    })
+                    .fail(function(xhr, status, error){
+                        console.error('加载表格数据失败:', error);
+                        renderTable([]);
+                    });
+            }
+
+            function renderTable(data) {
+                var html = '';
+                data.forEach(function(item){
+                    var sentimentClass = 'sentiment-' + (item.sentiment || 'neutral');
+                    var sentimentText = item.sentiment === 'positive' ? '正面' : item.sentiment === 'negative' ? '负面' : '中性';
+                    var riskClass = 'risk-' + (item.risk_level || 'low');
+                    var riskText = item.risk_level === 'low' ? '低' : item.risk_level === 'medium' ? '中' : '高';
+
+                    html += '<tr>';
+                    html += '<td>' + item.id + '</td>';
+                    html += '<td>' + (item.source_type === 'scout' ? '瞭望' : item.source_type === 'news' ? '新闻' : '问答') + '</td>';
+                    html += '<td title="' + (item.title || '') + '">' + (item.title || '-').substring(0, 30) + '</td>';
+                    html += '<td title="' + (item.content || '') + '">' + (item.content || '').substring(0, 80) + '...</td>';
+                    html += '<td><span class="sentiment-tag ' + sentimentClass + '">' + sentimentText + '</span></td>';
+                    html += '<td>' + (item.sentiment_score || 0).toFixed(2) + '</td>';
+                    html += '<td>' + ((item.confidence || 0) * 100).toFixed(0) + '%</td>';
+                    html += '<td title="' + (item.keywords || '') + '">' + (item.keywords || '').substring(0, 20) + '</td>';
+                    html += '<td class="' + riskClass + '">' + riskText + '</td>';
+                    html += '<td>' + (item.hot_score || 0).toFixed(0) + '</td>';
+                    html += '<td>' + (item.analyze_time || '') + '</td>';
+                    html += '<td><button class="layui-btn layui-btn-xs" onclick="viewDetail(' + item.id + ')">详情</button> <button class="layui-btn layui-btn-xs layui-btn-normal" onclick="reanalyze(' + item.id + ')">重分析</button></td>';
+                    html += '</tr>';
+                });
+                if (data.length === 0) {
+                    html = '<tr><td colspan="12" class="no-data">暂无数据</td></tr>';
+                }
+                $('#tableBody').html(html);
+            }
+
+            function renderPagination(total, current) {
+                var totalPages = Math.ceil(total / pageSize);
+                var html = '<div class="layui-box layui-laypage">';
+                html += '<a href="javascript:;" class="layui-laypage-prev' + (current === 1 ? ' layui-disabled' : '') + '" data-page="' + (current - 1) + '">上一页</a>';
+
+                var start = Math.max(1, current - 2);
+                var end = Math.min(totalPages, current + 2);
+
+                for (var i = start; i <= end; i++) {
+                    html += '<a href="javascript:;" class="' + (i === current ? 'layui-laypage-curr' : '') + '" data-page="' + i + '">' + i + '</a>';
+                }
+
+                html += '<a href="javascript:;" class="layui-laypage-next' + (current === totalPages ? ' layui-disabled' : '') + '" data-page="' + (current + 1) + '">下一页</a>';
+                html += '<span class="layui-laypage-count">共 ' + total + ' 条</span>';
+                html += '</div>';
+
+                $('#pageContainer').html(html);
+            }
+
+            window.viewDetail = function(id) {
+                $.get('/api/sentiment/detail/' + id, function(res){
+                    if (res.code === 0) {
+                        var d = res.data;
+                        var content = '<div style="padding:20px;">';
+                        content += '<p><strong>来源：</strong>' + (d.source_type === 'scout' ? '瞭望采集' : '智能问答') + '</p>';
+                        content += '<p><strong>标题：</strong>' + (d.title || '-') + '</p>';
+                        content += '<p><strong>内容：</strong></p><div style="background:#1a1f35;padding:10px;border-radius:4px;max-height:200px;overflow:auto;">' + (d.content || '') + '</div>';
+                        content += '<p><strong>AI摘要：</strong>' + (d.summary || '-') + '</p>';
+                        content += '<p><strong>情感：</strong>' + (d.sentiment === 'positive' ? '正面' : d.sentiment === 'negative' ? '负面' : '中性') + ' (得分:' + (d.sentiment_score || 0).toFixed(2) + ', 置信度:' + ((d.confidence || 0)*100).toFixed(0) + '%)</p>';
+                        content += '<p><strong>关键词：</strong>' + (d.keywords || '-') + '</p>';
+                        content += '<p><strong>风险等级：</strong>' + (d.risk_level === 'low' ? '低' : d.risk_level === 'medium' ? '中' : '高') + '</p>';
+                        content += '<p><strong>风险标签：</strong>' + (d.risk_tags || '-') + '</p>';
+                        content += '<p><strong>热度：</strong>' + (d.hot_score || 0).toFixed(2) + '</p>';
+                        content += '<p><strong>分析时间：</strong>' + (d.analyze_time || '') + '</p>';
+                        content += '</div>';
+                        layer.open({title: '舆情详情', type: 1, content: content, area: ['600px', '500px']});
+                    } else {
+                        layer.msg('获取详情失败', {icon: 2});
+                    }
+                });
+            };
+
+            window.reanalyze = function(id) {
+                layer.confirm('确定要重新分析这条记录吗？', function(index){
+                    $.post('/api/sentiment', {action: 'reanalyze', id: id}, function(res){
+                        if (res.code === 0) {
+                            layer.msg('重新分析成功', {icon: 1});
+                            loadTableData(currentPage);
+                            loadStats();
+                        } else {
+                            layer.msg('重新分析失败: ' + res.msg, {icon: 2});
+                        }
+                    });
+                    layer.close(index);
+                });
+            };
+
+            $('#searchBtn').click(function(){
+                loadTableData(1);
+            });
+
+            $('#analyzeBtn').click(function(){
+                layer.confirm('确定要运行AI分析吗？这将分析所有瞭望采集和聊天数据', function(index){
+                    layer.msg('正在分析，请稍候...', {icon: 16, shade: 0.3, time: 60000});
+                    $.post('/api/sentiment/analyze', {action: 'analyze_all'}, function(res){
+                        layer.close(index);
+                        if (res.code === 0) {
+                            layer.msg(res.msg, {icon: 1});
+                            loadTableData(1);
+                            loadStats();
+                        } else {
+                            layer.msg('分析失败: ' + res.msg, {icon: 2});
+                        }
+                    }).fail(function(){
+                        layer.close(index);
+                        layer.msg('网络错误', {icon: 2});
+                    });
+                });
+            });
+
+            $('#exportBtn').click(function(){
+                var sentiment = $('#sentimentSelect').val();
+                var sourceType = $('#sourceTypeSelect').val();
+                var days = $('#daysSelect').val();
+
+                var params = 'format=csv';
+                if (sentiment) params += '&sentiment=' + sentiment;
+                if (sourceType) params += '&source_type=' + sourceType;
+                if (days) params += '&days=' + days;
+
+                window.open('/api/sentiment?action=export&' + params, '_blank');
+            });
+
+            $(document).on('click', '.layui-laypage a[data-page]', function(){
+                var page = $(this).data('page');
+                if (!$(this).hasClass('layui-disabled') && page > 0) {
+                    loadTableData(page);
+                }
+            });
+
+            initCharts();
+            loadStats();
+            loadTableData(1);
+        });
+    </script>
+</body>
+</html>

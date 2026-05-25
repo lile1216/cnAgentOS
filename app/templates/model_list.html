@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>模型管理 - cnAgentOS管理系统</title>
+    <link rel="stylesheet" href="/static/dist/layui-v2.13.6/layui/css/layui.css">
+    <style>
+        body { margin: 0; padding: 0; background: #f5f5f5; }
+        .layui-layout-admin .layui-header { background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); box-shadow: 0 2px 10px rgba(0,0,0,0.15); }
+        .layui-header .layui-logo { color: white; font-size: 18px; font-weight: 600; padding: 0 30px; }
+        .layui-nav-item a { color: white !important; }
+        .layui-nav-item:hover { background: rgba(255,255,255,0.1); }
+        .layui-side { background: #2f4050; width: 200px; }
+        .layui-side-scroll { width: 220px; }
+        .layui-nav-tree .layui-nav-item a { color: #a7b1c2; height: 45px; line-height: 45px; padding-left: 25px; }
+        .layui-nav-tree .layui-nav-item a:hover { color: white; background: #293846; }
+        .layui-nav-tree .layui-nav-item.layui-nav-itemed>a { background: #1ab394 !important; color: white; }
+        .layui-body { background: #f3f3f4; left: 200px; padding: 20px; }
+        .user-avatar { width: 32px; height: 32px; border-radius: 50%; background: rgba(255,255,255,0.2); display: inline-block; line-height: 32px; text-align: center; margin-right: 8px; font-size: 14px; }
+        .page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .page-title { font-size: 20px; font-weight: 600; color: #676a6c; }
+        .layui-table { background: white; border-radius: 8px; box-shadow: 0 2px 12px 0 rgba(0,0,0,0.08); }
+    </style>
+</head>
+<body class="layui-layout-body">
+    <div class="layui-layout layui-layout-admin">
+        <!-- 头部 -->
+        <div class="layui-header">
+            <div class="layui-logo"><i class="layui-icon layui-icon-laptop"></i> cnAgentOS 管理系统</div>
+            <ul class="layui-nav layui-layout-right">
+                <li class="layui-nav-item"><a href="javascript:void(0)" id="refreshBtn"><i class="layui-icon layui-icon-refresh"></i> 刷新</a></li>
+                <li class="layui-nav-item"><a href="javascript:void(0)" id="fullscreenBtn"><i class="layui-icon layui-icon-screen-full"></i> 全屏</a></li>
+                <li class="layui-nav-item"><a href="javascript:void(0)" id="userMenu"><span class="user-avatar">{{ current_user[:1].upper() }}</span> {{ current_user }}</a></li>
+                <li class="layui-nav-item"><a href="/auth/logout" id="logoutBtn"><i class="layui-icon layui-icon-power"></i> 退出</a></li>
+            </ul>
+        </div>
+        
+        <!-- 侧边栏 -->
+        <div class="layui-side layui-bg-black">
+            <div class="layui-side-scroll">
+                <ul class="layui-nav layui-nav-tree" lay-filter="sideMenu">
+                    <li class="layui-nav-item">
+                        <a href="javascript:void(0)"><i class="layui-icon layui-icon-dashboard"></i> 系统管理</a>
+                        <dl class="layui-nav-child">
+                            <dd><a href="/admin/users">用户管理</a></dd>
+                            <dd><a href="/admin/roles">角色管理</a></dd>
+                            <dd><a href="/admin/permissions">权限管理</a></dd>
+                        </dl>
+                    </li>
+                    <li class="layui-nav-item">
+                        <a href="javascript:void(0)"><i class="layui-icon layui-icon-set"></i> 功能管理</a>
+                        <dl class="layui-nav-child">
+                            <dd><a href="/admin/functions">功能列表</a></dd>
+                            <dd><a href="/admin/modules">模块管理</a></dd>
+                        </dl>
+                    </li>
+                    <li class="layui-nav-item layui-nav-itemed">
+                        <a href="javascript:void(0)"><i class="layui-icon layui-icon-server"></i> 模型引擎</a>
+                        <dl class="layui-nav-child"><dd><a href="/admin/models">模型管理</a></dd></dl>
+                    </li>
+                    <li class="layui-nav-item"><a href="javascript:void(0)"><i class="layui-icon layui-icon-user"></i> 数字员工</a>
+                        <dl class="layui-nav-child">
+                            <dd><a href="/admin/employees">员工管理</a></dd>
+                        </dl>
+                    </li>
+                    <li class="layui-nav-item"><a href="javascript:void(0)"><i class="layui-icon layui-icon-search"></i> 瞭望管理</a>
+                        <dl class="layui-nav-child">
+                            <dd><a href="/admin/scout">瞭望源管理</a></dd>
+                            <dd><a href="/admin/scout/collect">数据采集</a></dd>
+                            <dd><a href="/admin/warehouse">数据仓库</a></dd>
+                        </dl>
+                    </li>
+                    <li class="layui-nav-item">
+                        <a href="javascript:void(0)"><i class="layui-icon layui-icon-link"></i> 接口管理</a>
+                        <dl class="layui-nav-child">
+                            <dd><a href="/admin/interfaces">接口列表</a></dd>
+                        </dl>
+                    </li>
+                    <li class="layui-nav-item"><a href="/admin"><i class="layui-icon layui-icon-home"></i> 返回首页</a></li>
+                </ul>
+            </div>
+        </div>
+        
+        <!-- 主体内容 -->
+        <div class="layui-body">
+            <div class="page-header">
+                <h2 class="page-title">模型管理</h2>
+                <button id="addBtn" class="layui-btn">添加模型</button>
+            </div>
+            <input type="hidden" id="xsrf_token" value="{{ xsrf_token }}">
+            <table id="modelTable" class="layui-table"></table>
+        </div>
+    </div>
+
+    <script type="text/html" id="barDemo">
+        <a class="layui-btn layui-btn-xs" lay-event="edit">编辑</a>
+        <a class="layui-btn layui-btn-danger layui-btn-xs" lay-event="del">删除</a>
+    </script>
+
+    <script src="/static/dist/layui-v2.13.6/layui/layui.js"></script>
+    <script>
+        layui.use(["table", "layer"], function() {
+            var table = layui.table;
+            var layer = layui.layer;
+            
+            var tableIns = table.render({
+                elem: "#modelTable",
+                url: "/api/models",
+                method: "get",
+                page: true,
+                limit: 20,
+                cols: [[
+                    {type: "checkbox"},
+                    {field: "id", title: "ID", width: 80},
+                    {field: "name", title: "模型名称", width: 150},
+                    {field: "model", title: "模型标识", width: 150},
+                    {field: "base_url", title: "API地址", width: 250},
+                    {field: "create_at", title: "创建时间", width: 180},
+                    {title: "操作", width: 150, toolbar: "#barDemo"}
+                ]]
+            });
+
+            table.on("tool(modelTable)", function(obj) {
+                var data = obj.data;
+                if (obj.event === "edit") {
+                    layer.open({
+                        title: "编辑模型",
+                        type: 1,
+                        content: `<div style="padding:20px;">
+                            <input type="hidden" id="editId" value="${data.id}">
+                            <div class="layui-form-item"><label class="layui-form-label">模型名称</label><div class="layui-input-block"><input type="text" value="${data.name}" class="layui-input" id="editName"></div></div>
+                            <div class="layui-form-item"><label class="layui-form-label">模型标识</label><div class="layui-input-block"><input type="text" value="${data.model}" class="layui-input" id="editModel"></div></div>
+                            <div class="layui-form-item"><label class="layui-form-label">API密钥</label><div class="layui-input-block"><input type="text" value="${data.api_key}" class="layui-input" id="editApiKey"></div></div>
+                            <div class="layui-form-item"><label class="layui-form-label">API地址</label><div class="layui-input-block"><input type="text" value="${data.base_url}" class="layui-input" id="editUrl"></div></div>
+                            <div class="layui-form-item"><label class="layui-form-label">最大Token</label><div class="layui-input-block"><input type="text" value="${data.max_tokens}" class="layui-input" id="editMaxTokens"></div></div>
+                            <div class="layui-form-item"><label class="layui-form-label">温度</label><div class="layui-input-block"><input type="text" value="${data.temperature}" class="layui-input" id="editTemperature"></div></div>
+                            <div class="layui-form-item"><label class="layui-form-label">设为默认</label><div class="layui-input-block"><input type="checkbox" id="editIsDefault" lay-skin="switch" lay-text="是|否" ${data.is_default == 1 ? 'checked' : ''}></div></div>
+                        </div>`,
+                        btn: ["确定", "取消"],
+                        yes: function(index) {
+                            var id = document.getElementById("editId").value;
+                            var name = document.getElementById("editName").value;
+                            var model = document.getElementById("editModel").value;
+                            var apiKey = document.getElementById("editApiKey").value;
+                            var baseUrl = document.getElementById("editUrl").value;
+                            var maxTokens = document.getElementById("editMaxTokens").value;
+                            var temperature = document.getElementById("editTemperature").value;
+                            var isDefault = document.getElementById("editIsDefault").checked;
+                            
+                            if (!name) { layer.msg("模型名称不能为空"); return; }
+                            
+                            var xhr = new XMLHttpRequest();
+                            xhr.open('POST', '/api/models', true);
+                            xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+                            xhr.onreadystatechange = function() {
+                                if(xhr.readyState === 4) {
+                                    var res = JSON.parse(xhr.responseText);
+                                    layer.msg(res.msg);
+                                    if(res.code === 0) {
+                                        tableIns.reload();
+                                        layer.close(index);
+                                    }
+                                }
+                            };
+                            var params = 'action=edit';
+                            params += '&id=' + id;
+                            params += '&name=' + encodeURIComponent(name);
+                            params += '&model=' + encodeURIComponent(model);
+                            params += '&api_key=' + encodeURIComponent(apiKey);
+                            params += '&base_url=' + encodeURIComponent(baseUrl);
+                            params += '&max_tokens=' + encodeURIComponent(maxTokens);
+                            params += '&temperature=' + encodeURIComponent(temperature);
+                            params += '&is_default=' + (isDefault ? 'true' : 'false');
+                            params += '&_xsrf=' + document.getElementById('xsrf_token').value;
+                            xhr.send(params);
+                        }
+                    });
+                } else if (obj.event === "del") {
+                    layer.confirm("确定删除该模型吗？", function(index) {
+                        var xhr = new XMLHttpRequest();
+                        xhr.open('POST', '/api/models', true);
+                        xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+                        xhr.onreadystatechange = function() {
+                            if(xhr.readyState === 4) {
+                                var res = JSON.parse(xhr.responseText);
+                                layer.msg(res.msg);
+                                if(res.code === 0) {
+                                    tableIns.reload();
+                                }
+                            }
+                        };
+                        xhr.send('action=delete&id=' + data.id + '&_xsrf=' + document.getElementById('xsrf_token').value);
+                        layer.close(index);
+                    });
+                }
+            });
+
+            document.getElementById("addBtn").onclick = function() {
+                layer.open({
+                    title: "添加模型",
+                    type: 1,
+                    content: `<div style="padding:20px;">
+                        <div class="layui-form-item"><label class="layui-form-label">模型名称</label><div class="layui-input-block"><input type="text" placeholder="请输入模型名称" class="layui-input" id="addName"></div></div>
+                        <div class="layui-form-item"><label class="layui-form-label">模型标识</label><div class="layui-input-block"><input type="text" placeholder="如: deepseek-v3" class="layui-input" id="addModel"></div></div>
+                        <div class="layui-form-item"><label class="layui-form-label">API密钥</label><div class="layui-input-block"><input type="text" placeholder="sk-xxx" class="layui-input" id="addApiKey"></div></div>
+                        <div class="layui-form-item"><label class="layui-form-label">API地址</label><div class="layui-input-block"><input type="text" placeholder="如: https://api.example.com/v1" class="layui-input" id="addUrl"></div></div>
+                        <div class="layui-form-item"><label class="layui-form-label">最大Token</label><div class="layui-input-block"><input type="text" placeholder="4096" class="layui-input" id="addMaxTokens" value="4096"></div></div>
+                        <div class="layui-form-item"><label class="layui-form-label">温度</label><div class="layui-input-block"><input type="text" placeholder="0.7" class="layui-input" id="addTemperature" value="0.7"></div></div>
+                        <div class="layui-form-item"><label class="layui-form-label">设为默认</label><div class="layui-input-block"><input type="checkbox" id="addIsDefault" lay-skin="switch" lay-text="是|否"></div></div>
+                    </div>`,
+                    btn: ["确定", "取消"],
+                    yes: function(index) {
+                        var name = document.getElementById("addName").value;
+                        var model = document.getElementById("addModel").value;
+                        var apiKey = document.getElementById("addApiKey").value;
+                        var baseUrl = document.getElementById("addUrl").value;
+                        var maxTokens = document.getElementById("addMaxTokens").value;
+                        var temperature = document.getElementById("addTemperature").value;
+                        var isDefault = document.getElementById("addIsDefault").checked;
+                        
+                        if (!name) { layer.msg("模型名称不能为空"); return; }
+                        if (!model) { layer.msg("模型标识不能为空"); return; }
+                        if (!apiKey) { layer.msg("API密钥不能为空"); return; }
+                        if (!baseUrl) { layer.msg("API地址不能为空"); return; }
+                        
+                        var xhr = new XMLHttpRequest();
+                        xhr.open('POST', '/api/models', true);
+                        xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+                        xhr.onreadystatechange = function() {
+                            if(xhr.readyState === 4) {
+                                var res = JSON.parse(xhr.responseText);
+                                layer.msg(res.msg);
+                                if(res.code === 0) {
+                                    tableIns.reload();
+                                    layer.close(index);
+                                }
+                            }
+                        };
+                        var params = 'action=add';
+                        params += '&name=' + encodeURIComponent(name);
+                        params += '&model=' + encodeURIComponent(model);
+                        params += '&api_key=' + encodeURIComponent(apiKey);
+                        params += '&base_url=' + encodeURIComponent(baseUrl);
+                        params += '&max_tokens=' + encodeURIComponent(maxTokens);
+                        params += '&temperature=' + encodeURIComponent(temperature);
+                        params += '&is_default=' + (isDefault ? 'true' : 'false');
+                        params += '&_xsrf=' + document.getElementById('xsrf_token').value;
+                        xhr.send(params);
+                    }
+                });
+            };
+        });
+    </script>
+</body>
+</html>

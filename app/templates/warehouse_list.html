@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>数据仓库 - cnAgentOS</title>
+    <link rel="stylesheet" href="/static/dist/layui-v2.13.6/layui/css/layui.css">
+    <style>
+        .stats-card { background: #fff; padding: 20px; border-radius: 4px; margin-bottom: 15px; }
+        .stats-num { font-size: 28px; font-weight: bold; color: #1E9FFF; }
+        .stats-label { color: #999; font-size: 13px; }
+        .layui-table-cell { height: auto; line-height: 28px; }
+        .ai-status { padding: 2px 8px; border-radius: 10px; font-size: 12px; }
+        .ai-pending { background: #FFB800; color: #fff; }
+        .ai-analyzing { background: #1E9FFF; color: #fff; }
+        .ai-completed { background: #5FB878; color: #fff; }
+        .ai-failed { background: #FF5722; color: #fff; }
+        .collect-modal .layui-form-item { margin-bottom: 15px; }
+        .log-container { background: #1a1a1a; color: #0f0; padding: 15px; border-radius: 4px; max-height: 300px; overflow-y: auto; font-family: 'Courier New', monospace; font-size: 12px; }
+        .log-item { margin-bottom: 5px; }
+        .log-time { color: #888; }
+        .log-success { color: #5FB878; }
+        .log-error { color: #FF5722; }
+        .log-info { color: #1E9FFF; }
+    </style>
+</head>
+<body class="layui-layout-body">
+<div class="layui-layout layui-layout-admin">
+    <div class="layui-header">
+        <div class="layui-logo"><i class="layui-icon layui-icon-laptop"></i> cnAgentOS 管理系统</div>
+        <ul class="layui-nav layui-layout-right">
+            <li class="layui-nav-item"><a href="javascript:void(0)" id="refreshBtn"><i class="layui-icon layui-icon-refresh"></i> 刷新</a></li>
+            <li class="layui-nav-item"><a href="javascript:void(0)" id="fullscreenBtn"><i class="layui-icon layui-icon-screen-full"></i> 全屏</a></li>
+            <li class="layui-nav-item"><a href="javascript:void(0)" id="userMenu"><span class="user-avatar">{{ current_user[:1].upper() }}</span> {{ current_user }}</a></li>
+            <li class="layui-nav-item"><a href="/auth/logout" id="logoutBtn"><i class="layui-icon layui-icon-power"></i> 退出</a></li>
+        </ul>
+    </div>
+    
+    <div class="layui-side layui-bg-black">
+        <div class="layui-side-scroll">
+            <ul class="layui-nav layui-nav-tree" lay-filter="sideMenu">
+                <li class="layui-nav-item">
+                    <a href="javascript:void(0)"><i class="layui-icon layui-icon-dashboard"></i> 系统管理</a>
+                    <dl class="layui-nav-child">
+                        <dd><a href="/admin/users">用户管理</a></dd>
+                        <dd><a href="/admin/roles">角色管理</a></dd>
+                        <dd><a href="/admin/permissions">权限管理</a></dd>
+                    </dl>
+                </li>
+                <li class="layui-nav-item">
+                    <a href="javascript:void(0)"><i class="layui-icon layui-icon-app"></i> 功能管理</a>
+                    <dl class="layui-nav-child">
+                        <dd><a href="/admin/functions">功能列表</a></dd>
+                        <dd><a href="/admin/modules">模块管理</a></dd>
+                    </dl>
+                </li>
+                <li class="layui-nav-item">
+                    <a href="javascript:void(0)"><i class="layui-icon layui-icon-engine"></i> 模型引擎</a>
+                    <dl class="layui-nav-child">
+                        <dd><a href="/admin/models">模型管理</a></dd>
+                    </dl>
+                </li>
+                <li class="layui-nav-item">
+                    <a href="javascript:void(0)"><i class="layui-icon layui-icon-user"></i> 数字员工</a>
+                    <dl class="layui-nav-child">
+                        <dd><a href="/admin/employees">员工管理</a></dd>
+                    </dl>
+                </li>
+                <li class="layui-nav-item layui-nav-itemed">
+                    <a href="javascript:void(0)"><i class="layui-icon layui-icon-search"></i> 瞭望管理</a>
+                    <dl class="layui-nav-child">
+                        <dd><a href="/admin/scout">瞭望源管理</a></dd>
+                        <dd><a href="/admin/scout/collect">数据采集</a></dd>
+                        <dd><a href="/admin/deep-collect">AI深度采集</a></dd>
+                        <dd class="layui-this"><a href="/admin/warehouse">数据仓库</a></dd>
+                    </dl>
+                </li>
+                <li class="layui-nav-item">
+                    <a href="javascript:void(0)"><i class="layui-icon layui-icon-link"></i> 接口管理</a>
+                    <dl class="layui-nav-child">
+                        <dd><a href="/admin/interfaces">接口列表</a></dd>
+                    </dl>
+                </li>
+            </ul>
+        </div>
+    </div>
+    
+    <div class="layui-body">
+        <div class="page-header">
+            <h2 class="page-title">数据仓库</h2>
+            <div class="page-actions">
+                <button id="collectBtn" class="layui-btn layui-btn-normal"><i class="layui-icon layui-icon-upload-circle"></i> 数据采集</button>
+                <button id="aiAnalyzeBtn" class="layui-btn layui-btn-warm"><i class="layui-icon layui-icon-engine"></i> AI深度分析</button>
+            </div>
+        </div>
+        
+        <div class="layui-row layui-col-space15">
+            <div class="layui-col-md3">
+                <div class="stats-card">
+                    <div class="stats-num" id="totalRecords">0</div>
+                    <div class="stats-label">总记录数</div>
+                </div>
+            </div>
+            <div class="layui-col-md3">
+                <div class="stats-card">
+                    <div class="stats-num" id="analyzedRecords">0</div>
+                    <div class="stats-label">已分析</div>
+                </div>
+            </div>
+            <div class="layui-col-md3">
+                <div class="stats-card">
+                    <div class="stats-num" id="unanalyzedRecords">0</div>
+                    <div class="stats-label">未分析</div>
+                </div>
+            </div>
+            <div class="layui-col-md3">
+                <div class="stats-card">
+                    <div class="stats-num" id="analyzeRate">0%</div>
+                    <div class="stats-label">分析率</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="layui-form layui-form-pane" style="padding: 10px 0;">
+            <div class="layui-form-item" style="margin-bottom: 0;">
+                <div class="layui-inline">
+                    <select id="filterSource" lay-filter="filterSource">
+                        <option value="">全部数据源</option>
+                        {% for source in sources %}
+                        <option value="{{ source['id'] }}">{{ source['name'] }}</option>
+                        {% end %}
+                    </select>
+                </div>
+                <div class="layui-inline">
+                    <select id="filterAi" lay-filter="filterAi">
+                        <option value="">全部状态</option>
+                        <option value="0">未分析</option>
+                        <option value="1">已分析</option>
+                    </select>
+                </div>
+                <div class="layui-inline">
+                    <input type="text" id="searchKeyword" placeholder="搜索标题" class="layui-input" style="width: 200px;">
+                </div>
+                <div class="layui-inline">
+                    <button id="searchBtn" class="layui-btn"><i class="layui-icon layui-icon-search"></i> 搜索</button>
+                </div>
+            </div>
+        </div>
+        
+        <input type="hidden" id="xsrf_token" value="{{ xsrf_token }}">
+        <table id="recordTable" class="layui-table" lay-filter="recordTable"></table>
+    </div>
+</div>
+
+<script type="text/html" id="toolbarTpl">
+    <div class="layui-btn-container">
+        <button class="layui-btn layui-btn-sm layui-btn-danger" lay-event="batchDelete"><i class="layui-icon layui-icon-delete"></i>批量删除</button>
+    </div>
+</script>
+
+<script type="text/html" id="operateTpl">
+    <a class="layui-btn layui-btn-xs" lay-event="detail"><i class="layui-icon layui-icon-search"></i>详情</a>
+    <a class="layui-btn layui-btn-normal layui-btn-xs" lay-event="analyze"><i class="layui-icon layui-icon-engine"></i>分析</a>
+    <a class="layui-btn layui-btn-danger layui-btn-xs" lay-event="delete"><i class="layui-icon layui-icon-delete"></i>删除</a>
+</script>
+
+<script src="/static/dist/layui-v2.13.6/layui/layui.js"></script>
+<script>
+layui.use(['table', 'layer', 'form'], function(){
+    var table = layui.table;
+    var layer = layui.layer;
+    var form = layui.form;
+    var xsrfToken = document.getElementById('xsrf_token').value;
+    
+    loadStats();
+    
+    var tableIns = table.render({
+        elem: '#recordTable',
+        url: '/api/warehouse',
+        page: true,
+        limit: 20,
+        toolbar: '#toolbarTpl',
+        defaultToolbar: ['filter', 'exports', 'print'],
+        cols: [[
+            {type: 'checkbox', fixed: 'left'},
+            {field: 'id', title: 'ID', width: 60, sort: true},
+            {field: 'title', title: '标题', minWidth: 300, templet: function(d){
+                return '<a href="/admin/warehouse/detail?id=' + d.id + '" class="layui-table-link" style="color:#1E9FFF;">' + (d.title || '无标题') + '</a>';
+            }},
+            {field: 'source_name', title: '数据源', width: 120},
+            {field: 'keyword', title: '关键字', width: 100},
+            {field: 'ai_analyzed', title: '分析状态', width: 100, templet: function(d){
+                if(d.ai_analyzed == 1){
+                    return '<span class="ai-status ai-completed">已分析</span>';
+                } else {
+                    return '<span class="ai-status ai-' + (d.ai_analyze_status || 'pending') + '">' + (d.ai_analyze_msg || '未分析') + '</span>';
+                }
+            }},
+            {field: 'ai_analyze_time', title: '分析时间', width: 160},
+            {field: 'collect_time', title: '采集时间', width: 160},
+            {fixed: 'right', title: '操作', toolbar: '#operateTpl', width: 200}
+        ]],
+        parseData: function(res){
+            return {
+                "code": res.code,
+                "msg": res.msg,
+                "count": res.count,
+                "data": res.data
+            };
+        }
+    });
+    
+    function loadStats(){
+        fetch('/api/warehouse/stats')
+            .then(res => res.json())
+            .then(data => {
+                if(data.code === 0){
+                    document.getElementById('totalRecords').textContent = data.data.total_records;
+                    document.getElementById('analyzedRecords').textContent = data.data.analyzed_records;
+                    document.getElementById('unanalyzedRecords').textContent = data.data.unanalyzed_records;
+                    document.getElementById('analyzeRate').textContent = data.data.analyze_rate;
+                }
+            });
+    }
+    
+    function reloadTable(){
+        var sourceId = document.getElementById('filterSource').value;
+        var aiAnalyzed = document.getElementById('filterAi').value;
+        var keyword = document.getElementById('searchKeyword').value;
+        
+        tableIns.reload({
+            where: {
+                source_id: sourceId,
+                ai_analyzed: aiAnalyzed,
+                keyword: keyword
+            },
+            page: {curr: 1}
+        });
+    }
+    
+    document.getElementById('searchBtn').onclick = reloadTable;
+    
+    document.getElementById('filterSource').onchange = reloadTable;
+    document.getElementById('filterAi').onchange = reloadTable;
+    
+    document.getElementById('collectBtn').onclick = function(){
+        layer.open({
+            type: 1,
+            title: '数据采集',
+            area: ['500px', '350px'],
+            content: `
+                <form class="layui-form collect-modal" style="padding: 20px;">
+                    <div class="layui-form-item">
+                        <label class="layui-form-label">数据源</label>
+                        <div class="layui-input-block">
+                            <select name="source_id" id="collectSource" lay-verify="required">
+                                <option value="">请选择数据源</option>
+                                {% for source in sources %}
+                                <option value="{{ source['id'] }}">{{ source['name'] }}</option>
+                                {% end %}
+                            </select>
+                        </div>
+                    </div>
+                    <div class="layui-form-item">
+                        <label class="layui-form-label">关键字</label>
+                        <div class="layui-input-block">
+                            <input type="text" name="keywords" id="collectKeywords" class="layui-input" placeholder="多个关键字用逗号分隔" lay-verify="required">
+                        </div>
+                    </div>
+                    <div class="layui-form-item">
+                        <div class="layui-input-block">
+                            <button type="button" class="layui-btn layui-btn-normal" id="doCollectBtn">开始采集</button>
+                        </div>
+                    </div>
+                    <div class="layui-form-item" id="collectLog" style="display:none;">
+                        <label class="layui-form-label">采集日志</label>
+                        <div class="layui-input-block">
+                            <div class="log-container" id="collectLogContent"></div>
+                        </div>
+                    </div>
+                </form>
+            `,
+            success: function(){
+                form.render('select');
+                
+                document.getElementById('doCollectBtn').onclick = function(){
+                    var sourceId = document.getElementById('collectSource').value;
+                    var keywords = document.getElementById('collectKeywords').value;
+                    
+                    if(!sourceId || !keywords){
+                        layer.msg('请填写完整信息');
+                        return;
+                    }
+                    
+                    document.getElementById('collectLog').style.display = 'block';
+                    document.getElementById('collectLogContent').innerHTML = '<div class="log-item"><span class="log-time">[' + new Date().toLocaleTimeString() + ']</span> <span class="log-info">开始采集...</span></div>';
+                    
+                    var xhr = new XMLHttpRequest();
+                    xhr.open('POST', '/api/warehouse', true);
+                    xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+                    
+                    xhr.onreadystatechange = function(){
+                        if(xhr.readyState === 4){
+                            var res = JSON.parse(xhr.responseText);
+                            document.getElementById('collectLogContent').innerHTML += '<div class="log-item"><span class="log-time">[' + new Date().toLocaleTimeString() + ']</span> <span class="log-' + (res.code === 0 ? 'success' : 'error') + '">' + res.msg + '</span></div>';
+                            
+                            if(res.code === 0){
+                                tableIns.reload();
+                                loadStats();
+                            }
+                        }
+                    };
+                    
+                    xhr.send('action=collect&source_id=' + sourceId + '&keywords=' + encodeURIComponent(keywords) + '&_xsrf=' + xsrfToken);
+                };
+            }
+        });
+    };
+    
+    document.getElementById('aiAnalyzeBtn').onclick = function(){
+        var checkStatus = table.checkStatus('recordTable');
+        var data = checkStatus.data;
+        
+        if(data.length === 0){
+            layer.msg('请选择要分析的记录');
+            return;
+        }
+        
+        var ids = data.map(function(item){ return item.id; });
+        
+        layer.open({
+            type: 1,
+            title: 'AI深度分析',
+            area: ['600px', '450px'],
+            content: `
+                <div style="padding: 20px;">
+                    <p>选中了 <strong>${ids.length}</strong> 条记录进行分析</p>
+                    <div class="log-container" id="aiLogContent" style="margin-top: 15px;"></div>
+                </div>
+            `,
+            success: function(){
+                document.getElementById('aiLogContent').innerHTML = '<div class="log-item"><span class="log-time">[' + new Date().toLocaleTimeString() + ']</span> <span class="log-info">开始AI深度分析...</span></div>';
+                
+                var processed = 0;
+                var successCount = 0;
+                var failCount = 0;
+                
+                function processNext(){
+                    if(processed >= ids.length){
+                        document.getElementById('aiLogContent').innerHTML += '<div class="log-item"><span class="log-time">[' + new Date().toLocaleTimeString() + ']</span> <span class="log-success">分析完成！成功: ' + successCount + '，失败: ' + failCount + '</span></div>';
+                        tableIns.reload();
+                        loadStats();
+                        return;
+                    }
+                    
+                    var recordId = ids[processed];
+                    document.getElementById('aiLogContent').innerHTML += '<div class="log-item"><span class="log-time">[' + new Date().toLocaleTimeString() + ']</span> <span class="log-info">正在分析记录 #' + recordId + '...</span></div>';
+                    
+                    var xhr = new XMLHttpRequest();
+                    xhr.open('POST', '/api/warehouse', true);
+                    xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+                    
+                    xhr.onreadystatechange = function(){
+                        if(xhr.readyState === 4){
+                            processed++;
+                            var res = JSON.parse(xhr.responseText);
+                            
+                            if(res.code === 0){
+                                successCount++;
+                                document.getElementById('aiLogContent').innerHTML += '<div class="log-item"><span class="log-time">[' + new Date().toLocaleTimeString() + ']</span> <span class="log-success">记录 #' + recordId + ' 分析成功</span></div>';
+                            } else {
+                                failCount++;
+                                document.getElementById('aiLogContent').innerHTML += '<div class="log-item"><span class="log-time">[' + new Date().toLocaleTimeString() + ']</span> <span class="log-error">记录 #' + recordId + ' 分析失败: ' + res.msg + '</span></div>';
+                            }
+                            
+                            setTimeout(processNext, 500);
+                        }
+                    };
+                    
+                    xhr.send('action=aiAnalyze&record_id=' + recordId + '&_xsrf=' + xsrfToken);
+                }
+                
+                setTimeout(processNext, 500);
+            }
+        });
+    };
+    
+    table.on('toolbar(recordTable)', function(obj){
+        var checkStatus = table.checkStatus(obj.config.id);
+        var data = checkStatus.data;
+        
+        if(obj.event === 'batchDelete'){
+            if(data.length === 0){
+                layer.msg('请选择要删除的数据');
+                return;
+            }
+            var ids = data.map(function(item){ return item.id; });
+            layer.confirm('确定删除选中的 ' + ids.length + ' 条数据吗？', function(index){
+                var xhr = new XMLHttpRequest();
+                xhr.open('POST', '/api/warehouse', true);
+                xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+                xhr.onreadystatechange = function(){
+                    if(xhr.readyState === 4){
+                        var res = JSON.parse(xhr.responseText);
+                        layer.msg(res.msg);
+                        if(res.code === 0){
+                            tableIns.reload();
+                            loadStats();
+                        }
+                    }
+                };
+                xhr.send('action=batchDelete&ids=' + ids.join(',') + '&_xsrf=' + xsrfToken);
+                layer.close(index);
+            });
+        }
+    });
+    
+    table.on('tool(recordTable)', function(obj){
+        var data = obj.data;
+        
+        if(obj.event === 'detail'){
+            window.location.href = '/admin/warehouse/detail?id=' + data.id;
+        }
+        
+        if(obj.event === 'analyze'){
+            if(data.ai_analyzed){
+                layer.msg('该记录已分析');
+                return;
+            }
+            
+            layer.load();
+            var xhr = new XMLHttpRequest();
+            xhr.open('POST', '/api/warehouse', true);
+            xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+            xhr.onreadystatechange = function(){
+                layer.closeAll('loading');
+                if(xhr.readyState === 4){
+                    var res = JSON.parse(xhr.responseText);
+                    layer.msg(res.msg);
+                    if(res.code === 0){
+                        tableIns.reload();
+                        loadStats();
+                    }
+                }
+            };
+            xhr.send('action=aiAnalyze&record_id=' + data.id + '&_xsrf=' + xsrfToken);
+        }
+        
+        if(obj.event === 'delete'){
+            layer.confirm('确定删除该记录吗？', function(index){
+                var xhr = new XMLHttpRequest();
+                xhr.open('POST', '/api/warehouse', true);
+                xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+                xhr.onreadystatechange = function(){
+                    if(xhr.readyState === 4){
+                        var res = JSON.parse(xhr.responseText);
+                        layer.msg(res.msg);
+                        if(res.code === 0){
+                            tableIns.reload();
+                            loadStats();
+                        }
+                    }
+                };
+                xhr.send('action=delete&id=' + data.id + '&_xsrf=' + xsrfToken);
+                layer.close(index);
+            });
+        }
+    });
+    
+    document.getElementById('refreshBtn').onclick = function(){
+        tableIns.reload();
+        loadStats();
+    };
+    
+    document.getElementById('fullscreenBtn').onclick = function(){
+        var doc = document;
+        var docEl = doc.documentElement;
+        var requestFullScreen = docEl.requestFullscreen || docEl.mozRequestFullScreen || docEl.webkitRequestFullScreen || docEl.msRequestFullscreen;
+        var cancelFullScreen = doc.exitFullscreen || doc.mozCancelFullScreen || doc.webkitExitFullscreen || doc.msExitFullscreen;
+        
+        if(!doc.fullscreenElement && !doc.mozFullScreenElement && !doc.webkitFullscreenElement && !doc.msFullscreenElement){
+            requestFullScreen.call(docEl);
+        } else {
+            cancelFullScreen.call(doc);
+        }
+    };
+});
+</script>
+</body>
+</html>

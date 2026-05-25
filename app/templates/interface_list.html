@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>接口管理 - cnAgentOS</title>
+    <link rel="stylesheet" href="/static/dist/layui-v2.13.6/layui/css/layui.css">
+    <style>
+        body { margin: 0; padding: 0; background: #f5f5f5; }
+        .layui-layout-admin .layui-header { background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); box-shadow: 0 2px 10px rgba(0,0,0,0.15); }
+        .layui-header .layui-logo { color: white; font-size: 18px; font-weight: 600; padding: 0 30px; }
+        .layui-nav-item a { color: white !important; }
+        .layui-nav-item:hover { background: rgba(255,255,255,0.1); }
+        .layui-side { background: #2f4050; width: 200px; }
+        .layui-side-scroll { width: 220px; }
+        .layui-nav-tree .layui-nav-item a { color: #a7b1c2; height: 45px; line-height: 45px; padding-left: 25px; }
+        .layui-nav-tree .layui-nav-item a:hover { color: white; background: #293846; }
+        .layui-nav-tree .layui-nav-item.layui-nav-itemed>a { background: #1ab394 !important; color: white; }
+        .layui-body { background: #f3f3f4; left: 200px; padding: 20px; }
+        .user-avatar { width: 32px; height: 32px; border-radius: 50%; background: rgba(255,255,255,0.2); display: inline-block; line-height: 32px; text-align: center; margin-right: 8px; font-size: 14px; }
+        .page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .page-title { font-size: 20px; font-weight: 600; color: #676a6c; }
+        .layui-table { background: white; border-radius: 8px; box-shadow: 0 2px 12px 0 rgba(0,0,0,0.08); }
+    </style>
+</head>
+<body class="layui-layout-body">
+    <div class="layui-layout layui-layout-admin">
+        <div class="layui-header">
+            <div class="layui-logo"><i class="layui-icon layui-icon-laptop"></i> cnAgentOS 管理系统</div>
+            <ul class="layui-nav layui-layout-right">
+                <li class="layui-nav-item"><a href="javascript:void(0)" id="refreshBtn"><i class="layui-icon layui-icon-refresh"></i> 刷新</a></li>
+                <li class="layui-nav-item"><a href="javascript:void(0)" id="fullscreenBtn"><i class="layui-icon layui-icon-screen-full"></i> 全屏</a></li>
+                <li class="layui-nav-item"><a href="javascript:void(0)" id="userMenu"><span class="user-avatar">{{ current_user[:1].upper() }}</span> {{ current_user }}</a></li>
+                <li class="layui-nav-item"><a href="/auth/logout" id="logoutBtn"><i class="layui-icon layui-icon-power"></i> 退出</a></li>
+            </ul>
+        </div>
+        
+        <div class="layui-side layui-bg-black">
+            <div class="layui-side-scroll">
+                <ul class="layui-nav layui-nav-tree" lay-filter="sideMenu">
+                    <li class="layui-nav-item">
+                        <a href="javascript:void(0)"><i class="layui-icon layui-icon-dashboard"></i> 系统管理</a>
+                        <dl class="layui-nav-child">
+                            <dd><a href="/admin/users">用户管理</a></dd>
+                            <dd><a href="/admin/roles">角色管理</a></dd>
+                            <dd><a href="/admin/permissions">权限管理</a></dd>
+                        </dl>
+                    </li>
+                    <li class="layui-nav-item">
+                        <a href="javascript:void(0)"><i class="layui-icon layui-icon-set"></i> 功能管理</a>
+                        <dl class="layui-nav-child">
+                            <dd><a href="/admin/functions">功能列表</a></dd>
+                            <dd><a href="/admin/modules">模块管理</a></dd>
+                        </dl>
+                    </li>
+                    <li class="layui-nav-item">
+                        <a href="javascript:void(0)"><i class="layui-icon layui-icon-server"></i> 模型引擎</a>
+                        <dl class="layui-nav-child"><dd><a href="/admin/models">模型管理</a></dd></dl>
+                    </li>
+                    <li class="layui-nav-item">
+                        <a href="javascript:void(0)"><i class="layui-icon layui-icon-user"></i> 数字员工</a>
+                        <dl class="layui-nav-child">
+                            <dd><a href="/admin/employees">员工管理</a></dd>
+                        </dl>
+                    </li>
+                    <li class="layui-nav-item">
+                        <a href="javascript:void(0)"><i class="layui-icon layui-icon-search"></i> 瞭望管理</a>
+                        <dl class="layui-nav-child">
+                            <dd><a href="/admin/scout">瞭望源管理</a></dd>
+                            <dd><a href="/admin/scout/collect">数据采集</a></dd>
+                            <dd><a href="/admin/warehouse">数据仓库</a></dd>
+                        </dl>
+                    </li>
+                    <li class="layui-nav-item layui-nav-itemed">
+                        <a href="javascript:void(0)"><i class="layui-icon layui-icon-link"></i> 接口管理</a>
+                        <dl class="layui-nav-child">
+                            <dd class="layui-this"><a href="/admin/interfaces">接口列表</a></dd>
+                        </dl>
+                    </li>
+                </ul>
+            </div>
+        </div>
+        
+        <div class="layui-body">
+            <div class="page-header">
+                <h2 class="page-title">接口管理</h2>
+                <button id="addBtn" class="layui-btn"><i class="layui-icon layui-icon-add-1"></i> 添加接口</button>
+            </div>
+            <input type="hidden" id="xsrf_token" value="{{ xsrf_token }}">
+            <table id="interfaceTable" class="layui-table" lay-filter="interfaceTable"></table>
+        </div>
+    </div>
+
+    <script type="text/html" id="toolbarTpl">
+        <div class="layui-btn-container">
+            <button class="layui-btn layui-btn-sm layui-btn-danger" lay-event="batchDelete"><i class="layui-icon layui-icon-delete"></i> 批量删除</button>
+        </div>
+    </script>
+
+    <script type="text/html" id="methodTpl">
+        &#123;&#123;# if(d.method === 'GET'){ &#125;&#125;
+            <span class="layui-badge layui-bg-green">GET</span>
+        &#123;&#123;# } else if(d.method === 'POST'){ &#125;&#125;
+            <span class="layui-badge layui-bg-blue">POST</span>
+        &#123;&#123;# } else if(d.method === 'PUT'){ &#125;&#125;
+            <span class="layui-badge layui-bg-orange">PUT</span>
+        &#123;&#123;# } else if(d.method === 'DELETE'){ &#125;&#125;
+            <span class="layui-badge layui-bg-red">DELETE</span>
+        &#123;&#123;# } else { &#125;&#125;
+            <span class="layui-badge">&#123;&#123; d.method &#125;&#125;</span>
+        &#123;&#123;# } &#125;&#125;
+    </script>
+
+    <script type="text/html" id="urlTpl">
+        <a href="&#123;&#123; d.url &#125;&#125;" target="_blank" style="color:#1E9FFF;word-break:break-all;">&#123;&#123; d.url &#125;&#125;</a>
+    </script>
+
+    <script type="text/html" id="operateTpl">
+        <a class="layui-btn layui-btn-normal layui-btn-xs" lay-event="edit"><i class="layui-icon layui-icon-edit"></i> 编辑</a>
+        <a class="layui-btn layui-btn-danger layui-btn-xs" lay-event="delete"><i class="layui-icon layui-icon-delete"></i> 删除</a>
+    </script>
+
+    <script src="/static/dist/layui-v2.13.6/layui/layui.js"></script>
+    <script>
+layui.use(['table', 'layer', 'form'], function(){
+    var table = layui.table;
+    var layer = layui.layer;
+    var form = layui.form;
+    var xsrfToken = document.getElementById('xsrf_token').value;
+    
+    var tableIns = table.render({
+        elem: '#interfaceTable',
+        url: '/api/interfaces',
+        page: true,
+        limit: 20,
+        toolbar: '#toolbarTpl',
+        defaultToolbar: ['filter', 'exports', 'print'],
+        cols: [[
+            {type: 'checkbox', fixed: 'left'},
+            {field: 'id', title: 'ID', width: 60, sort: true},
+            {field: 'name', title: '接口名称', width: 150},
+            {field: 'method', title: '请求方式', width: 100, templet: '#methodTpl'},
+            {field: 'url', title: '接口地址', minWidth: 300, templet: '#urlTpl'},
+            {field: 'qps_limit', title: 'QPS限制', width: 100},
+            {field: 'description', title: '描述', minWidth: 200},
+            {field: 'create_at', title: '创建时间', width: 160},
+            {fixed: 'right', title: '操作', toolbar: '#operateTpl', width: 150}
+        ]],
+        parseData: function(res){
+            return {
+                "code": res.code,
+                "msg": res.msg,
+                "count": res.count,
+                "data": res.data
+            };
+        }
+    });
+    
+    table.on('toolbar(interfaceTable)', function(obj){
+        var checkStatus = table.checkStatus(obj.config.id);
+        var data = checkStatus.data;
+        
+        if(obj.event === 'batchDelete'){
+            if(data.length === 0){
+                layer.msg('请选择要删除的数据');
+                return;
+            }
+            var ids = data.map(function(item){ return item.id; });
+            layer.confirm('确定删除选中的 ' + ids.length + ' 条数据吗？', function(index){
+                var xhr = new XMLHttpRequest();
+                xhr.open('POST', '/api/interfaces', true);
+                xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+                xhr.onreadystatechange = function(){
+                    if(xhr.readyState === 4){
+                        var res = JSON.parse(xhr.responseText);
+                        layer.msg(res.msg);
+                        if(res.code === 0){
+                            tableIns.reload();
+                        }
+                    }
+                };
+                xhr.send('action=batchDelete&ids=' + ids.join(',') + '&_xsrf=' + xsrfToken);
+                layer.close(index);
+            });
+        }
+    });
+    
+    table.on('tool(interfaceTable)', function(obj){
+        var data = obj.data;
+        
+        if(obj.event === 'edit'){
+            layer.open({
+                type: 1,
+                title: '编辑接口',
+                area: ['700px', '550px'],
+                content: `
+                    <form class="layui-form" style="padding: 20px;" lay-filter="editForm">
+                        <input type="hidden" name="id" value="${data.id}">
+                        <div class="layui-form-item">
+                            <label class="layui-form-label">接口名称</label>
+                            <div class="layui-input-block">
+                                <input type="text" name="name" value="${data.name}" class="layui-input" required>
+                            </div>
+                        </div>
+                        <div class="layui-form-item">
+                            <label class="layui-form-label">请求方式</label>
+                            <div class="layui-input-block">
+                                <select name="method">
+                                    <option value="GET" ${data.method === 'GET' ? 'selected' : ''}>GET</option>
+                                    <option value="POST" ${data.method === 'POST' ? 'selected' : ''}>POST</option>
+                                    <option value="PUT" ${data.method === 'PUT' ? 'selected' : ''}>PUT</option>
+                                    <option value="DELETE" ${data.method === 'DELETE' ? 'selected' : ''}>DELETE</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="layui-form-item">
+                            <label class="layui-form-label">接口地址</label>
+                            <div class="layui-input-block">
+                                <input type="text" name="url" value="${data.url}" class="layui-input" required>
+                            </div>
+                        </div>
+                        <div class="layui-form-item">
+                            <label class="layui-form-label">QPS限制</label>
+                            <div class="layui-input-block">
+                                <input type="text" name="qps_limit" value="${data.qps_limit || ''}" class="layui-input">
+                            </div>
+                        </div>
+                        <div class="layui-form-item">
+                            <label class="layui-form-label">备注</label>
+                            <div class="layui-input-block">
+                                <textarea name="remark" class="layui-textarea">${data.remark || ''}</textarea>
+                            </div>
+                        </div>
+                        <div class="layui-form-item">
+                            <label class="layui-form-label">返回格式</label>
+                            <div class="layui-input-block">
+                                <input type="text" name="response_format" value="${data.response_format || 'JSON'}" class="layui-input">
+                            </div>
+                        </div>
+                        <div class="layui-form-item">
+                            <label class="layui-form-label">请求示例</label>
+                            <div class="layui-input-block">
+                                <textarea name="example" class="layui-textarea" rows="2">${data.example || ''}</textarea>
+                            </div>
+                        </div>
+                        <div class="layui-form-item">
+                            <label class="layui-form-label">Token需求</label>
+                            <div class="layui-input-block">
+                                <input type="checkbox" name="token_required" lay-skin="switch" lay-text="需要|不需要" ${data.token_required == 1 ? 'checked' : ''}>
+                            </div>
+                        </div>
+                        <div class="layui-form-item">
+                            <div class="layui-input-block">
+                                <button class="layui-btn" lay-submit lay-filter="submitEdit">保存</button>
+                            </div>
+                        </div>
+                    </form>
+                `,
+                success: function(){
+                    form.render();
+                    
+                    form.on('submit(submitEdit)', function(formData){
+                        var xhr = new XMLHttpRequest();
+                        xhr.open('POST', '/api/interfaces', true);
+                        xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+                        xhr.onreadystatechange = function(){
+                            if(xhr.readyState === 4){
+                                var res = JSON.parse(xhr.responseText);
+                                layer.msg(res.msg);
+                                if(res.code === 0){
+                                    layer.close(layer.index);
+                                    tableIns.reload();
+                                }
+                            }
+                        };
+                        var params = 'action=edit&id=' + formData.field.id;
+                        params += '&name=' + encodeURIComponent(formData.field.name);
+                        params += '&method=' + formData.field.method;
+                        params += '&url=' + encodeURIComponent(formData.field.url);
+                        params += '&qps_limit=' + encodeURIComponent(formData.field.qps_limit || '');
+                        params += '&remark=' + encodeURIComponent(formData.field.remark || '');
+                        params += '&response_format=' + encodeURIComponent(formData.field.response_format || 'JSON');
+                        params += '&example=' + encodeURIComponent(formData.field.example || '');
+                        params += '&token_required=' + (formData.field.token_required === 'on' ? 'true' : 'false');
+                        params += '&_xsrf=' + xsrfToken;
+                        xhr.send(params);
+                        return false;
+                    });
+                }
+            });
+        }
+        
+        if(obj.event === 'delete'){
+            layer.confirm('确定删除该接口吗？', function(index){
+                var xhr = new XMLHttpRequest();
+                xhr.open('POST', '/api/interfaces', true);
+                xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+                xhr.onreadystatechange = function(){
+                    if(xhr.readyState === 4){
+                        var res = JSON.parse(xhr.responseText);
+                        layer.msg(res.msg);
+                        if(res.code === 0){
+                            tableIns.reload();
+                        }
+                    }
+                };
+                xhr.send('action=delete&id=' + data.id + '&_xsrf=' + xsrfToken);
+                layer.close(index);
+            });
+        }
+    });
+    
+    document.getElementById('addBtn').onclick = function(){
+        layer.open({
+            type: 1,
+            title: '添加接口',
+            area: ['700px', '550px'],
+            content: `
+                <form class="layui-form" style="padding: 20px;">
+                    <div class="layui-form-item">
+                        <label class="layui-form-label">接口名称</label>
+                        <div class="layui-input-block">
+                            <input type="text" name="name" class="layui-input" placeholder="请输入接口名称" required>
+                        </div>
+                    </div>
+                    <div class="layui-form-item">
+                        <label class="layui-form-label">请求方式</label>
+                        <div class="layui-input-block">
+                            <select name="method">
+                                <option value="GET">GET</option>
+                                <option value="POST">POST</option>
+                                <option value="PUT">PUT</option>
+                                <option value="DELETE">DELETE</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="layui-form-item">
+                        <label class="layui-form-label">接口地址</label>
+                        <div class="layui-input-block">
+                            <input type="text" name="url" class="layui-input" placeholder="https://api.example.com/..." required>
+                        </div>
+                    </div>
+                    <div class="layui-form-item">
+                        <label class="layui-form-label">QPS限制</label>
+                        <div class="layui-input-block">
+                            <input type="text" name="qps_limit" value="" class="layui-input" placeholder="每2秒最多4次">
+                        </div>
+                    </div>
+                    <div class="layui-form-item">
+                        <label class="layui-form-label">备注</label>
+                        <div class="layui-input-block">
+                            <textarea name="remark" class="layui-textarea" placeholder="请输入备注信息"></textarea>
+                        </div>
+                    </div>
+                    <div class="layui-form-item">
+                        <label class="layui-form-label">返回格式</label>
+                        <div class="layui-input-block">
+                            <input type="text" name="response_format" value="JSON" class="layui-input">
+                        </div>
+                    </div>
+                    <div class="layui-form-item">
+                        <label class="layui-form-label">请求示例</label>
+                        <div class="layui-input-block">
+                            <textarea name="example" class="layui-textarea" rows="2" placeholder="https://api.example.com/?param=value"></textarea>
+                        </div>
+                    </div>
+                    <div class="layui-form-item">
+                        <label class="layui-form-label">Token需求</label>
+                        <div class="layui-input-block">
+                            <input type="checkbox" name="token_required" lay-skin="switch" lay-text="需要|不需要">
+                        </div>
+                    </div>
+                    <div class="layui-form-item">
+                        <div class="layui-input-block">
+                            <button class="layui-btn" lay-submit lay-filter="submitAdd">添加</button>
+                        </div>
+                    </div>
+                </form>
+            `,
+            success: function(){
+                form.render();
+                
+                form.on('submit(submitAdd)', function(formData){
+                    var xhr = new XMLHttpRequest();
+                    xhr.open('POST', '/api/interfaces', true);
+                    xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+                    xhr.onreadystatechange = function(){
+                        if(xhr.readyState === 4){
+                            var res = JSON.parse(xhr.responseText);
+                            layer.msg(res.msg);
+                            if(res.code === 0){
+                                layer.close(layer.index);
+                                tableIns.reload();
+                            }
+                        }
+                    };
+                    var params = 'action=add';
+                    params += '&name=' + encodeURIComponent(formData.field.name);
+                    params += '&method=' + formData.field.method;
+                    params += '&url=' + encodeURIComponent(formData.field.url);
+                    params += '&qps_limit=' + encodeURIComponent(formData.field.qps_limit || '');
+                    params += '&remark=' + encodeURIComponent(formData.field.remark || '');
+                    params += '&response_format=' + encodeURIComponent(formData.field.response_format || 'JSON');
+                    params += '&example=' + encodeURIComponent(formData.field.example || '');
+                    params += '&token_required=' + (formData.field.token_required === 'on' ? 'true' : 'false');
+                    params += '&_xsrf=' + xsrfToken;
+                    xhr.send(params);
+                    return false;
+                });
+            }
+        });
+    };
+    
+    document.getElementById('refreshBtn').onclick = function(){
+        tableIns.reload();
+    };
+    
+    document.getElementById('fullscreenBtn').onclick = function(){
+        var doc = document;
+        var docEl = doc.documentElement;
+        var requestFullScreen = docEl.requestFullscreen || docEl.mozRequestFullScreen || docEl.webkitRequestFullScreen || docEl.msRequestFullscreen;
+        var cancelFullScreen = doc.exitFullscreen || doc.mozCancelFullScreen || doc.webkitExitFullscreen || doc.msExitFullscreen;
+        
+        if(!doc.fullscreenElement && !doc.mozFullScreenElement && !doc.webkitFullscreenElement && !doc.msFullscreenElement){
+            requestFullScreen.call(docEl);
+        } else {
+            cancelFullScreen.call(doc);
+        }
+    };
+});
+    </script>
+</body>
+</html>

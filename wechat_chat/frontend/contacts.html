@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>通讯录 - 智能聊天子系统</title>
+    <link rel="stylesheet" href="/static/layui/css/layui.css">
+    <style>
+        body { background: #f5f5f5; display: flex; flex-direction: column; height: 100vh; }
+        .header { height: 60px; background: #393D49; color: #fff; display: flex; align-items: center; padding: 0 20px; }
+        .container { flex: 1; display: flex; max-width: 1200px; margin: 20px auto; width: 100%; gap: 20px; }
+        .sidebar { width: 280px; background: #fff; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); overflow-y: auto; }
+        .main-panel { flex: 1; background: #fff; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); padding: 20px; }
+        
+        .list-header { padding: 15px; border-bottom: 1px solid #eee; font-weight: bold; color: #333; display: flex; justify-content: space-between; align-items: center; }
+        .list-item { padding: 12px 15px; border-bottom: 1px solid #f9f9f9; cursor: pointer; display: flex; align-items: center; gap: 10px; transition: background 0.2s; }
+        .list-item:hover { background: #f0f0f0; }
+        .avatar { width: 40px; height: 40px; border-radius: 4px; background: #eee; display: flex; align-items: center; justify-content: center; font-size: 20px; flex-shrink: 0; }
+        .item-info { flex: 1; min-width: 0; }
+        .item-name { font-size: 14px; color: #333; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        
+        .user-profile { padding: 15px; border-bottom: 1px solid #eee; display: flex; align-items: center; gap: 12px; cursor: pointer; transition: background 0.2s; }
+        .user-profile:hover { background: #f9f9f9; }
+        .user-profile .avatar { width: 45px; height: 45px; background: #009688; color: #fff; }
+        
+        .search-box { margin-bottom: 20px; display: flex; gap: 10px; }
+        .request-item { padding: 15px; background: #fdfdfd; border: 1px solid #eee; border-radius: 4px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div style="font-size: 18px; font-weight: bold;">Wechat Chat 通讯录</div>
+        <div style="margin-left: auto;">
+            <a href="/wechat-chat/home" style="color: #fff; margin-right: 15px;">返回主页</a>
+            <button class="layui-btn layui-btn-sm" id="addFriendBtn" style="background-color: #009688;">添加好友</button>
+            <button class="layui-btn layui-btn-sm" id="createGroupBtn" style="background-color: #009688;">创建群聊</button>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="sidebar">
+            <div class="user-profile" id="myProfile">
+                <div class="avatar" id="myAvatar">👤</div>
+                <div class="item-info">
+                    <div class="item-name" id="myNickname" style="font-weight: bold; font-size: 16px;">加载中...</div>
+                    <div style="font-size: 12px; color: #999;">账号: <span id="myUsername">...</span></div>
+                </div>
+            </div>
+            <div class="list-header">我的好友</div>
+            <div id="friendList"></div>
+            <div class="list-header" style="margin-top: 10px;">我的群聊</div>
+            <div id="groupList"></div>
+        </div>
+
+        <div class="main-panel">
+            <div id="emptyTip" style="text-align: center; color: #999; margin-top: 100px;">
+                <i class="layui-icon layui-icon-friends" style="font-size: 64px;"></i>
+                <p>点击左侧好友或群聊查看详情</p>
+            </div>
+            
+            <div id="contactDetail" style="display: none;">
+                <h2 id="detailName" style="margin-bottom: 20px;"></h2>
+                <div id="detailInfo" style="color: #666; margin-bottom: 30px;"></div>
+                <button class="layui-btn" id="startChatBtn">发消息</button>
+            </div>
+
+            <div id="friendRequests" style="margin-top: 40px; display: none;">
+                <hr>
+                <h3 style="margin-bottom: 15px;">好友申请</h3>
+                <div id="requestList"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/layui/layui.js"></script>
+    <script>
+    layui.use(['layer', 'form'], function(){
+        var layer = layui.layer;
+        var $ = layui.$;
+        var selectedContact = null;
+
+        function loadContacts() {
+            $.get('/wechat-chat/api/contacts?action=list', function(res){
+                if(res.code === 0){
+                    // 更新个人信息
+                    var me = res.data.me;
+                    if(me){
+                        $('#myNickname').text(me.nickname || me.username);
+                        $('#myUsername').text(me.username);
+                        $('#myAvatar').text(me.avatar || '👤');
+                    }
+
+                    var friendsHtml = '';
+                    res.data.friends.forEach(function(f){
+                        friendsHtml += '<div class="list-item" data-type="private" data-id="'+f.id+'" data-name="'+(f.remark || f.nickname || f.username)+'">' +
+                                      '<div class="avatar">'+(f.avatar || '👤')+'</div>' +
+                                      '<div class="item-info"><div class="item-name">'+(f.remark || f.nickname || f.username)+'</div></div></div>';
+                    });
+                    $('#friendList').html(friendsHtml || '<div style="padding:15px;color:#999;font-size:12px;">暂无好友</div>');
+
+                    var groupsHtml = '';
+                    res.data.groups.forEach(function(g){
+                        groupsHtml += '<div class="list-item" data-type="group" data-id="'+g.id+'" data-name="'+g.name+'">' +
+                                     '<div class="avatar">'+(g.avatar || '👥')+'</div>' +
+                                     '<div class="item-info"><div class="item-name">'+g.name+'</div></div></div>';
+                    });
+                    $('#groupList').html(groupsHtml || '<div style="padding:15px;color:#999;font-size:12px;">暂无群聊</div>');
+                }
+            });
+        }
+
+        function loadRequests() {
+            $.get('/wechat-chat/api/contacts?action=requests', function(res){
+                if(res.code === 0 && res.data.length > 0){
+                    $('#friendRequests').show();
+                    var html = '';
+                    res.data.forEach(function(r){
+                        html += '<div class="request-item">' +
+                                '<div><b>'+r.nickname+'</b>: '+r.message+'</div>' +
+                                '<div><button class="layui-btn layui-btn-xs accept-btn" data-id="'+r.id+'">同意</button></div></div>';
+                    });
+                    $('#requestList').html(html);
+                }
+            });
+        }
+
+        $('#myProfile').click(function(){
+            var oldNickname = $('#myNickname').text();
+            var oldAvatar = $('#myAvatar').text();
+            
+            layer.open({
+                title: '修改个人信息',
+                content: '<div class="layui-form" style="padding:20px;">' +
+                         '<div class="layui-form-item"><label class="layui-form-label">昵称</label><div class="layui-input-block"><input type="text" id="editNickname" value="'+oldNickname+'" class="layui-input"></div></div>' +
+                         '<div class="layui-form-item"><label class="layui-form-label">头像(Emoji)</label><div class="layui-input-block"><input type="text" id="editAvatar" value="'+oldAvatar+'" class="layui-input" maxlength="2"></div></div>' +
+                         '</div>',
+                btn: ['确定', '取消'],
+                yes: function(index){
+                    var nickname = $('#editNickname').val().strip ? $('#editNickname').val().strip() : $('#editNickname').val().trim();
+                    var avatar = $('#editAvatar').val().strip ? $('#editAvatar').val().strip() : $('#editAvatar').val().trim();
+                    
+                    $.ajax({
+                        url: '/wechat-chat/api/contacts',
+                        type: 'POST',
+                        contentType: 'application/json',
+                        data: JSON.stringify({action: 'update_me', nickname: nickname, avatar: avatar}),
+                        success: function(res){
+                            if(res.code === 0){
+                                layer.msg('修改成功');
+                                layer.close(index);
+                                loadContacts();
+                            }
+                        }
+                    });
+                }
+            });
+        });
+
+        $(document).on('click', '.list-item', function(){
+            var type = $(this).data('type');
+            var id = $(this).data('id');
+            var name = $(this).data('name');
+            selectedContact = {type: type, id: id, name: name};
+            
+            $('#emptyTip').hide();
+            $('#contactDetail').show();
+            $('#detailName').text(name);
+            $('#detailInfo').text(type === 'private' ? '系统用户 ID: ' + id : '群聊 ID: ' + id);
+        });
+
+        $('#startChatBtn').click(function(){
+            if(selectedContact){
+                window.location.href = '/wechat-chat/chat?target_id=' + selectedContact.id + '&chat_type=' + selectedContact.type;
+            }
+        });
+
+        $('#addFriendBtn').click(function(){
+            layer.prompt({title: '输入对方用户名 (或输入 chuannong_helper, weather_helper, soup_helper 添加助手)', formType: 0}, function(val, index){
+                var username = val.trim();
+                if(!username) return;
+                
+                $.get('/wechat-chat/api/contacts?action=search&username=' + encodeURIComponent(username), function(res){
+                    if(res.code === 0){
+                        layer.close(index);
+                        layer.confirm('找到用户: ' + res.data.nickname + '，确认发送好友申请？', function(idx){
+                            $.ajax({
+                                url: '/wechat-chat/api/contacts',
+                                type: 'POST',
+                                contentType: 'application/json',
+                                data: JSON.stringify({action: 'send_request', target_id: res.data.id}),
+                                success: function(){
+                                    layer.msg('申请已发送');
+                                    layer.close(idx);
+                                }
+                            });
+                        });
+                    } else {
+                        layer.msg(res.msg);
+                    }
+                });
+            });
+        });
+
+        $(document).on('click', '.accept-btn', function(){
+            var rid = $(this).data('id');
+            $.ajax({
+                url: '/wechat-chat/api/contacts',
+                type: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({action: 'handle_request', request_id: rid, status: 1}),
+                success: function(){
+                    layer.msg('已添加好友');
+                    loadContacts();
+                    loadRequests();
+                }
+            });
+        });
+
+        $('#createGroupBtn').click(function(){
+            layer.prompt({title: '请输入群聊名称', formType: 0}, function(name, index){
+                var groupName = name.trim();
+                if(!groupName) return;
+                
+                $.ajax({
+                    url: '/wechat-chat/api/groups',
+                    type: 'POST',
+                    contentType: 'application/json',
+                    data: JSON.stringify({name: groupName, member_ids: []}),
+                    success: function(res){
+                        if(res.code === 0){
+                            layer.msg('群聊创建成功');
+                            layer.close(index);
+                            loadContacts();
+                        }
+                    }
+                });
+            });
+        });
+
+        loadContacts();
+        loadRequests();
+    });
+    </script>
+</body>
+</html>
