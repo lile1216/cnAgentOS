@@ -3,7 +3,7 @@ import tornado.web
 from tornado.httpserver import HTTPServer
 import os
 
-from app.models.db import init_db, init_scout_sources, init_api_interfaces, init_digital_employees
+from app.models.db import init_db, init_default_users, init_scout_sources, init_api_interfaces, init_digital_employees, init_sentiment_samples
 from app.models.user import UserRepository
 
 # 导入控制器
@@ -20,6 +20,11 @@ from app.controllers.interface import InterfaceListHandler, InterfaceApiHandler
 from app.controllers.warehouse import WarehouseListHandler, WarehouseApiHandler, WarehouseDetailHandler, WarehouseStatsApiHandler
 from app.controllers.deep_collect import DeepCollectListHandler, DeepCollectApiHandler, DeepCollectStatsApiHandler
 from app.controllers.chat import ChatHandler, ChatApiHandler, ChatSessionListHandler
+from app.controllers.friend_chat import FriendChatHandler
+from app.controllers.friendship import FriendApiHandler, PrivateChatApiHandler
+from app.controllers.group_chat import GroupChatApiHandler
+from app.controllers.chat_system import ChatSystemHandler
+from app.controllers.admin_group import AdminGroupHandler, AdminGroupApiHandler, AdminFileHandler, AdminFileApiHandler, AdminServerHandler, AdminServerApiHandler
 from app.controllers.datav import DataVListHandler, DataVScreenHandler, DataVApiHandler, DataVStatsApiHandler, DataVLocationApiHandler, DataVCacheClearHandler
 from app.controllers.sentiment import SentimentListHandler, SentimentApiHandler, SentimentStatsApiHandler, SentimentAnalyzeHandler, SentimentDetailHandler
 from wechat_chat.backend.chat_routes import get_chat_routes
@@ -111,6 +116,23 @@ def make_app():
             (r"/chat", ChatHandler),
             (r"/api/chat", ChatApiHandler),
             (r"/api/chat/sessions", ChatSessionListHandler),
+            
+            # 好友聊天路由
+            (r"/chat/friend", FriendChatHandler),
+            (r"/api/friend", FriendApiHandler),
+            (r"/api/chat/private", PrivateChatApiHandler),
+            
+            # 群聊路由
+            (r"/chat/system", ChatSystemHandler),
+            (r"/api/group", GroupChatApiHandler),
+            
+            # 后台管理路由
+            (r"/admin/group", AdminGroupHandler),
+            (r"/api/admin/group", AdminGroupApiHandler),
+            (r"/admin/file", AdminFileHandler),
+            (r"/api/admin/file", AdminFileApiHandler),
+            (r"/admin/server", AdminServerHandler),
+            (r"/api/admin/server", AdminServerApiHandler),
         ]
     
     # 整合子系统路由
@@ -140,14 +162,14 @@ def init_admin_user():
 
 if __name__ == "__main__":
     init_db()
+    init_default_users()
     init_admin_user()
     init_scout_sources()
     init_api_interfaces()
     init_digital_employees()
+    init_sentiment_samples()
     
     app = make_app()
-    server = HTTPServer(app)
-    server.bind(10086)
-    server.start()
-    print("====== Server 启动成功 ====== 端口：10086 =======", flush=True)
+    app.listen(1086)
+    print("====== Server 启动成功 ====== 端口：1086 =======", flush=True)
     tornado.ioloop.IOLoop.current().start()

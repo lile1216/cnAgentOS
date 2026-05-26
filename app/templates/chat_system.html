@@ -1,0 +1,821 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>智能聊天 - cnAgentOS</title>
+    <link rel="stylesheet" href="/static/dist/layui-v2.13.6/layui/css/layui.css">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f7fa; height: 100vh; overflow: hidden; }
+        
+        .chat-system { display: flex; height: 100vh; }
+        
+        .left-panel { width: 260px; background: #fff; border-right: 1px solid #e8ecf0; display: flex; flex-direction: column; }
+        .left-header { padding: 15px; border-bottom: 1px solid #e8ecf0; }
+        .left-header h2 { font-size: 16px; font-weight: 600; margin-bottom: 10px; }
+        
+        .search-box { position: relative; }
+        .search-box input { width: 100%; padding: 8px 28px; border: 1px solid #e8ecf0; border-radius: 20px; font-size: 13px; }
+        .search-box .icon { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: #999; font-size: 14px; }
+        
+        .tabs { display: flex; margin-top: 10px; }
+        .tab-item { flex: 1; padding: 8px; text-align: center; font-size: 13px; cursor: pointer; color: #666; position: relative; }
+        .tab-item.active { color: #10a37f; font-weight: 500; }
+        .tab-item.active::after { content: ''; position: absolute; bottom: 0; left: 50%; transform: translateX(-50%); width: 24px; height: 2px; background: #10a37f; }
+        
+        .tab-content { flex: 1; overflow-y: auto; padding: 8px; }
+        
+        .contact-item { padding: 10px; border-radius: 8px; cursor: pointer; display: flex; align-items: center; gap: 10px; transition: all 0.2s; margin-bottom: 4px; }
+        .contact-item:hover { background: #f5f7fa; }
+        .contact-item.active { background: #e8f5f1; }
+        .contact-item.group { border-left: 3px solid #667eea; }
+        .contact-item.employee { border-left: 3px solid #f5a623; }
+        .contact-avatar { width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: bold; color: #fff; }
+        .contact-avatar.default { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+        .contact-avatar.group { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+        .contact-avatar.employee { background: linear-gradient(135deg, #f5a623 0%, #f78b00 100%); }
+        .contact-info { flex: 1; min-width: 0; }
+        .contact-name { font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .contact-desc { font-size: 11px; color: #999; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .unread-badge { background: #ff6b6b; color: #fff; font-size: 10px; padding: 1px 5px; border-radius: 8px; min-width: 16px; text-align: center; }
+        
+        .main-panel { flex: 1; display: flex; flex-direction: column; background: #f5f7fa; }
+        .chat-header { padding: 12px 20px; background: #fff; border-bottom: 1px solid #e8ecf0; display: flex; align-items: center; gap: 12px; }
+        .chat-avatar { width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 16px; font-weight: bold; color: #fff; }
+        .chat-info { flex: 1; }
+        .chat-name { font-size: 15px; font-weight: 600; }
+        .chat-status { font-size: 12px; color: #666; }
+        .chat-actions { display: flex; gap: 10px; }
+        .action-btn { width: 32px; height: 32px; border: none; border-radius: 50%; background: #f5f7fa; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 14px; }
+        .action-btn:hover { background: #e8ecf0; }
+        
+        .chat-messages { flex: 1; overflow-y: auto; padding: 20px; }
+        .message { max-width: 70%; margin-bottom: 16px; display: flex; gap: 10px; }
+        .message.self { margin-left: auto; flex-direction: row-reverse; }
+        .message-avatar { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 14px; flex-shrink: 0; }
+        .message.self .message-avatar { background: linear-gradient(135deg, #10a37f 0%, #0d8a6a 100%); color: #fff; }
+        .message.friend .message-avatar { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #fff; }
+        .message.employee .message-avatar { background: linear-gradient(135deg, #f5a623 0%, #f78b00 100%); color: #fff; }
+        
+        .message-content { padding: 10px 14px; border-radius: 12px; font-size: 14px; line-height: 1.6; word-break: break-all; }
+        .message.self .message-content { background: #10a37f; color: #fff; border-radius: 12px 12px 0 12px; }
+        .message.friend .message-content { background: #fff; border-radius: 12px 12px 12px 0; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+        .message.employee .message-content { background: #fff8f0; border-radius: 12px; border: 1px solid #ffe4cc; }
+        
+        .message-time { font-size: 10px; color: #999; margin-top: 4px; }
+        .message.self .message-time { text-align: right; }
+        .message.friend .message-time, .message.employee .message-time { text-align: left; }
+        
+        .chat-input-area { padding: 12px 20px; background: #fff; border-top: 1px solid #e8ecf0; }
+        .input-tools { display: flex; gap: 10px; margin-bottom: 10px; }
+        .tool-btn { width: 36px; height: 36px; border: none; border-radius: 8px; background: #f5f7fa; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 16px; }
+        .tool-btn:hover { background: #e8ecf0; }
+        
+        .chat-input-wrapper { display: flex; gap: 10px; align-items: flex-end; }
+        .chat-input { flex: 1; padding: 10px 14px; border: 1px solid #e8ecf0; border-radius: 20px; font-size: 14px; resize: none; min-height: 40px; max-height: 100px; line-height: 1.5; }
+        .chat-input:focus { outline: none; border-color: #10a37f; }
+        .send-btn { width: 40px; height: 40px; background: #10a37f; border: none; border-radius: 50%; color: #fff; cursor: pointer; font-size: 16px; display: flex; align-items: center; justify-content: center; }
+        .send-btn:hover { background: #0d8a6a; }
+        .send-btn:disabled { background: #ccc; cursor: not-allowed; }
+        
+        .welcome-screen { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 40px; }
+        .welcome-icon { font-size: 64px; margin-bottom: 20px; }
+        .welcome-screen h2 { font-size: 24px; margin-bottom: 10px; }
+        .welcome-screen p { color: #666; font-size: 14px; }
+        
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center; }
+        .modal-overlay.show { display: flex; }
+        .modal { background: #fff; border-radius: 12px; width: 400px; max-width: 90%; padding: 20px; }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .modal-title { font-size: 16px; font-weight: 600; }
+        .modal-close { cursor: pointer; font-size: 20px; color: #999; }
+        .modal-body { margin-bottom: 20px; }
+        .form-group { margin-bottom: 15px; }
+        .form-group label { display: block; font-size: 13px; margin-bottom: 5px; }
+        .form-group input, .form-group textarea { width: 100%; padding: 10px; border: 1px solid #e8ecf0; border-radius: 8px; font-size: 14px; }
+        .form-group textarea { resize: none; min-height: 60px; }
+        .modal-footer { display: flex; gap: 10px; justify-content: flex-end; }
+        .btn-cancel { padding: 8px 20px; border: 1px solid #e8ecf0; border-radius: 8px; background: #fff; cursor: pointer; font-size: 14px; }
+        .btn-confirm { padding: 8px 20px; border: none; border-radius: 8px; background: #10a37f; color: #fff; cursor: pointer; font-size: 14px; }
+        
+        .friend-select-list { max-height: 200px; overflow-y: auto; }
+        .friend-select-item { padding: 10px; border-radius: 8px; cursor: pointer; display: flex; align-items: center; gap: 10px; margin-bottom: 5px; }
+        .friend-select-item:hover { background: #f5f7fa; }
+        .friend-select-item.selected { background: #e8f5f1; }
+        .friend-select-item input[type="checkbox"] { margin-right: 5px; }
+        
+        .emoji-picker { position: absolute; bottom: 60px; right: 20px; background: #fff; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); padding: 10px; display: none; }
+        .emoji-picker.show { display: block; }
+        .emoji-grid { display: grid; grid-template-columns: repeat(8, 1fr); gap: 5px; }
+        .emoji-item { width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; font-size: 18px; cursor: pointer; border-radius: 4px; }
+        .emoji-item:hover { background: #f5f7fa; }
+        
+        .file-upload-area { border: 2px dashed #e8ecf0; border-radius: 8px; padding: 20px; text-align: center; cursor: pointer; }
+        .file-upload-area:hover { border-color: #10a37f; }
+        .file-upload-area i { font-size: 32px; color: #999; }
+        
+        .employee-list { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+        .employee-card { padding: 15px; border-radius: 8px; background: #fff; text-align: center; cursor: pointer; border: 1px solid #e8ecf0; }
+        .employee-card:hover { border-color: #10a37f; }
+        .employee-avatar { font-size: 32px; margin-bottom: 8px; }
+        .employee-name { font-size: 13px; font-weight: 500; }
+        
+        .empty-state { text-align: center; padding: 40px 20px; color: #999; }
+        .empty-icon { font-size: 48px; margin-bottom: 15px; }
+        
+        @media (max-width: 768px) {
+            .left-panel { width: 100%; position: absolute; z-index: 10; left: -100%; transition: left 0.3s; }
+            .left-panel.show { left: 0; }
+        }
+    </style>
+</head>
+<body>
+<div class="chat-system">
+    <div class="left-panel" id="leftPanel">
+        <div class="left-header">
+            <h2>💬 智能聊天</h2>
+            <div class="search-box">
+                <span class="icon">🔍</span>
+                <input type="text" id="searchInput" placeholder="搜索联系人...">
+            </div>
+            <div class="tabs">
+                <div class="tab-item active" data-tab="friends">好友</div>
+                <div class="tab-item" data-tab="groups">群聊</div>
+                <div class="tab-item" data-tab="employees">数字员工</div>
+                <div class="tab-item" data-tab="add">添加好友</div>
+            </div>
+        </div>
+        
+        <div class="tab-content">
+            <div class="tab-panel active" id="friendsPanel">
+                <div id="friendsList"></div>
+            </div>
+            <div class="tab-panel" id="groupsPanel">
+                <div id="groupsList"></div>
+            </div>
+            <div class="tab-panel" id="employeesPanel">
+                <div id="employeesList"></div>
+            </div>
+            <div class="tab-panel" id="addPanel">
+                <div style="padding: 10px;">
+                    <input type="text" class="form-control" id="searchUserInput" placeholder="输入用户名搜索" style="width: 100%; padding: 10px; border: 1px solid #e8ecf0; border-radius: 8px; margin-bottom: 10px;">
+                    <button class="btn-confirm" style="width: 100%;" onclick="searchUserToAdd()">搜索用户</button>
+                    <div id="searchResult" style="margin-top: 15px;"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="main-panel">
+        <div class="chat-header" id="chatHeader">
+            <div class="chat-avatar" id="chatAvatar">👤</div>
+            <div class="chat-info">
+                <div class="chat-name" id="chatName">选择联系人开始聊天</div>
+                <div class="chat-status" id="chatStatus">在线</div>
+            </div>
+            <div class="chat-actions">
+                <button class="action-btn" onclick="createGroupModal()" title="创建群聊">➕</button>
+                <button class="action-btn" onclick="showMemberList()" title="成员列表">👥</button>
+            </div>
+        </div>
+        
+        <div class="chat-messages" id="chatMessages">
+            <div class="welcome-screen">
+                <div class="welcome-icon">💬</div>
+                <h2>开始聊天</h2>
+                <p>从左侧选择一个联系人或群聊开始对话</p>
+            </div>
+        </div>
+        
+        <div class="chat-input-area">
+            <div class="input-tools">
+                <button class="tool-btn" onclick="toggleEmojiPicker()">😊</button>
+                <button class="tool-btn" onclick="selectFile()">📎</button>
+                <button class="tool-btn" onclick="showCreateGroup()">➕群</button>
+            </div>
+            <div class="chat-input-wrapper">
+                <textarea class="chat-input" id="chatInput" placeholder="输入消息..." rows="1"></textarea>
+                <button class="send-btn" id="sendBtn" onclick="sendMessage()">➤</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="emoji-picker" id="emojiPicker">
+    <div class="emoji-grid" id="emojiGrid"></div>
+</div>
+
+<div class="modal-overlay" id="createGroupModal">
+    <div class="modal">
+        <div class="modal-header">
+            <div class="modal-title">创建群聊</div>
+            <div class="modal-close" onclick="closeModal('createGroupModal')">×</div>
+        </div>
+        <div class="modal-body">
+            <div class="form-group">
+                <label>群名称</label>
+                <input type="text" id="groupNameInput" placeholder="请输入群名称">
+            </div>
+            <div class="form-group">
+                <label>选择好友（可选）</label>
+                <div class="friend-select-list" id="friendSelectList"></div>
+            </div>
+            <div class="form-group">
+                <label>添加数字员工（可选）</label>
+                <div class="employee-list" id="employeeSelectList"></div>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn-cancel" onclick="closeModal('createGroupModal')">取消</button>
+            <button class="btn-confirm" onclick="createGroup()">创建</button>
+        </div>
+    </div>
+</div>
+
+<div class="modal-overlay" id="memberListModal">
+    <div class="modal" style="width: 500px;">
+        <div class="modal-header">
+            <div class="modal-title">群成员</div>
+            <div class="modal-close" onclick="closeModal('memberListModal')">×</div>
+        </div>
+        <div class="modal-body">
+            <div id="memberList"></div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn-cancel" onclick="closeModal('memberListModal')">关闭</button>
+        </div>
+    </div>
+</div>
+
+<input type="hidden" id="xsrf_token" value="{{ xsrf_token }}">
+<input type="hidden" id="currentChatType" value="">
+<input type="hidden" id="currentChatId" value="">
+<input type="hidden" id="currentChatName" value="">
+
+<script src="/static/dist/layui-v2.13.6/layui/layui.js"></script>
+<script>
+var currentChatType = '';
+var currentChatId = '';
+var currentChatName = '';
+var xsrfToken = document.getElementById('xsrf_token').value;
+
+var emojis = ['😀', '😃', '😄', '😁', '😆', '😅', '🤣', '😂',
+              '🙂', '😊', '😇', '🥰', '😍', '🤩', '😘', '😗',
+              '😚', '😙', '🥲', '😋', '😛', '😜', '🤪', '😝',
+              '🤑', '🤗', '🤭', '🤫', '🤔', '🤐', '🤨', '😐',
+              '😑', '😶', '😏', '😒', '🙄', '😬', '🤥', '😌',
+              '❤️', '🧡', '💛', '💚', '💙', '💜', '🖤', '🤍',
+              '🤎', '💯', '✨', '🔥', '💪', '👍', '👎', '👏',
+              '🙌', '🎉', '🎊', '🎁', '🎈', '⭐', '🌟', '💫'];
+
+document.querySelectorAll('.tab-item').forEach(function(item) {
+    item.addEventListener('click', function() {
+        document.querySelectorAll('.tab-item').forEach(function(t) { t.classList.remove('active'); });
+        document.querySelectorAll('.tab-panel').forEach(function(p) { p.classList.remove('active'); });
+        this.classList.add('active');
+        document.getElementById(this.dataset.tab + 'Panel').classList.add('active');
+        
+        if (this.dataset.tab === 'friends') loadFriends();
+        else if (this.dataset.tab === 'groups') loadGroups();
+        else if (this.dataset.tab === 'employees') loadEmployees();
+    });
+});
+
+document.getElementById('searchInput').addEventListener('input', function() {
+    filterContacts(this.value);
+});
+
+document.getElementById('chatInput').addEventListener('input', function() {
+    this.style.height = 'auto';
+    this.style.height = Math.min(this.scrollHeight, 100) + 'px';
+});
+
+document.getElementById('chatInput').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        sendMessage();
+    }
+});
+
+function toggleEmojiPicker() {
+    document.getElementById('emojiPicker').classList.toggle('show');
+}
+
+function initEmojiGrid() {
+    var grid = document.getElementById('emojiGrid');
+    emojis.forEach(function(emoji) {
+        var item = document.createElement('div');
+        item.className = 'emoji-item';
+        item.textContent = emoji;
+        item.onclick = function() {
+            document.getElementById('chatInput').value += emoji;
+            toggleEmojiPicker();
+        };
+        grid.appendChild(item);
+    });
+}
+
+function filterContacts(keyword) {
+    var items = document.querySelectorAll('.contact-item');
+    items.forEach(function(item) {
+        var name = item.querySelector('.contact-name').textContent;
+        if (keyword === '' || name.toLowerCase().includes(keyword.toLowerCase())) {
+            item.style.display = 'flex';
+        } else {
+            item.style.display = 'none';
+        }
+    });
+}
+
+function loadFriends() {
+    fetch('/api/friend?action=list')
+        .then(res => res.json())
+        .then(data => {
+            if (data.code === 0) {
+                if (data.data.length === 0) {
+                    document.getElementById('friendsList').innerHTML = `
+                        <div class="empty-state">
+                            <div class="empty-icon">👥</div>
+                            <p>暂无好友</p>
+                        </div>
+                    `;
+                } else {
+                    var html = '';
+                    data.data.forEach(function(friend) {
+                        html += `
+                            <div class="contact-item" data-type="friend" data-id="${friend.id}" 
+                                 onclick="selectContact('friend', ${friend.id}, '${friend.username}')">
+                                <div class="contact-avatar default">${friend.username.slice(0,1).toUpperCase()}</div>
+                                <div class="contact-info">
+                                    <div class="contact-name">${friend.username}</div>
+                                    <div class="contact-desc">在线</div>
+                                </div>
+                            </div>
+                        `;
+                    });
+                    document.getElementById('friendsList').innerHTML = html;
+                }
+            }
+        });
+}
+
+function loadGroups() {
+    fetch('/api/group?action=list')
+        .then(res => res.json())
+        .then(data => {
+            if (data.code === 0) {
+                if (data.data.length === 0) {
+                    document.getElementById('groupsList').innerHTML = `
+                        <div class="empty-state">
+                            <div class="empty-icon">👥</div>
+                            <p>暂无群聊</p>
+                        </div>
+                    `;
+                } else {
+                    var html = '';
+                    data.data.forEach(function(group) {
+                        html += `
+                            <div class="contact-item group" data-type="group" data-id="${group.id}" 
+                                 onclick="selectContact('group', ${group.id}, '${group.name}')">
+                                <div class="contact-avatar group">${group.avatar}</div>
+                                <div class="contact-info">
+                                    <div class="contact-name">${group.name}</div>
+                                    <div class="contact-desc">${group.member_count}位成员</div>
+                                </div>
+                            </div>
+                        `;
+                    });
+                    document.getElementById('groupsList').innerHTML = html;
+                }
+            }
+        });
+}
+
+function loadEmployees() {
+    fetch('/api/group?action=employees')
+        .then(res => res.json())
+        .then(data => {
+            if (data.code === 0) {
+                var html = '';
+                data.data.forEach(function(emp) {
+                    html += `
+                        <div class="contact-item employee" data-type="employee" data-id="${emp.name}" 
+                             onclick="selectContact('employee', '${emp.name}', '${emp.name}')">
+                            <div class="contact-avatar employee">${emp.avatar}</div>
+                            <div class="contact-info">
+                                <div class="contact-name">${emp.name}</div>
+                                <div class="contact-desc">数字员工</div>
+                            </div>
+                        </div>
+                    `;
+                });
+                document.getElementById('employeesList').innerHTML = html;
+            }
+        });
+}
+
+function searchUserToAdd() {
+    var keyword = document.getElementById('searchUserInput').value.trim();
+    if (!keyword) {
+        layer.msg('请输入用户名');
+        return;
+    }
+    
+    fetch('/api/friend?action=search&keyword=' + encodeURIComponent(keyword))
+        .then(res => res.json())
+        .then(data => {
+            if (data.code === 0) {
+                if (data.data.length === 0) {
+                    document.getElementById('searchResult').innerHTML = '<p style="color: #999;">未找到用户</p>';
+                } else {
+                    var html = '';
+                    data.data.forEach(function(user) {
+                        html += `
+                            <div class="contact-item" style="border: 1px solid #e8ecf0;">
+                                <div class="contact-avatar default">${user.username.slice(0,1).toUpperCase()}</div>
+                                <div class="contact-info">
+                                    <div class="contact-name">${user.username}</div>
+                                    <div class="contact-desc">${user.role}</div>
+                                </div>
+                                ${user.is_friend ? 
+                                    '<span style="color: #10a37f; font-size: 12px;">已添加</span>' : 
+                                    '<button class="btn-confirm" style="padding: 4px 10px; font-size: 12px;" onclick="sendFriendRequest(\'' + user.username + '\')">添加</button>'
+                                }
+                            </div>
+                        `;
+                    });
+                    document.getElementById('searchResult').innerHTML = html;
+                }
+            }
+        });
+}
+
+function speak(text) {
+    if ('speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+        var utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = 'zh-CN';
+        utterance.rate = 0.8;
+        window.speechSynthesis.speak(utterance);
+    }
+}
+
+function sendFriendRequest(username) {
+    var formData = new FormData();
+    formData.append('action', 'add');
+    formData.append('username', username);
+    formData.append('_xsrf', xsrfToken);
+    
+    fetch('/api/friend', { method: 'POST', body: formData })
+        .then(res => res.json())
+        .then(data => {
+            layer.msg(data.msg);
+            if (data.code === 0) {
+                speak('添加好友成功');
+                document.getElementById('searchResult').innerHTML = '<p style="color: #10a37f;">添加好友成功</p>';
+                loadFriends();
+                setTimeout(function() {
+                    selectContact('friend', username, username);
+                    document.getElementById('chatInput').focus();
+                }, 1000);
+            }
+        });
+}
+
+function selectContact(type, id, name) {
+    currentChatType = type;
+    currentChatId = id;
+    currentChatName = name;
+    
+    document.getElementById('currentChatType').value = type;
+    document.getElementById('currentChatId').value = id;
+    document.getElementById('currentChatName').value = name;
+    
+    document.querySelectorAll('.contact-item').forEach(function(item) {
+        item.classList.remove('active');
+    });
+    document.querySelector(`[data-type="${type}"][data-id="${id}"]`).classList.add('active');
+    
+    var avatar = name.slice(0, 1).toUpperCase();
+    if (type === 'group') avatar = '👥';
+    else if (type === 'employee') avatar = name.slice(0, 1);
+    
+    document.getElementById('chatAvatar').textContent = avatar;
+    document.getElementById('chatName').textContent = name;
+    document.getElementById('chatStatus').textContent = type === 'friend' ? '在线' : type === 'group' ? '群聊' : '数字员工';
+    
+    document.getElementById('chatMessages').innerHTML = '';
+    loadMessages();
+    
+    if (window.innerWidth < 768) {
+        document.getElementById('leftPanel').classList.remove('show');
+    }
+}
+
+function loadMessages() {
+    if (!currentChatId) return;
+    
+    if (currentChatType === 'friend') {
+        fetch('/api/chat/private?action=messages&friend_id=' + currentChatId)
+            .then(res => res.json())
+            .then(data => {
+                if (data.code === 0) {
+                    data.data.forEach(function(msg) {
+                        addMessage(msg, 'friend');
+                    });
+                    scrollToBottom();
+                }
+            });
+    } else if (currentChatType === 'group') {
+        fetch('/api/group?action=messages&group_id=' + currentChatId)
+            .then(res => res.json())
+            .then(data => {
+                if (data.code === 0) {
+                    data.data.forEach(function(msg) {
+                        addMessage(msg, 'group');
+                    });
+                    scrollToBottom();
+                }
+            });
+    } else if (currentChatType === 'employee') {
+        document.getElementById('chatMessages').innerHTML = `
+            <div class="message employee">
+                <div class="message-avatar">${currentChatName.slice(0, 1)}</div>
+                <div>
+                    <div class="message-content">您好！我是${currentChatName}，请问有什么可以帮您的？</div>
+                    <div class="message-time">刚刚</div>
+                </div>
+            </div>
+        `;
+        scrollToBottom();
+    }
+}
+
+function sendMessage() {
+    var content = document.getElementById('chatInput').value.trim();
+    if (!content || !currentChatId) return;
+    
+    if (currentChatType === 'friend') {
+        var formData = new FormData();
+        formData.append('action', 'send');
+        formData.append('friend_id', currentChatId);
+        formData.append('content', content);
+        formData.append('_xsrf', xsrfToken);
+        
+        fetch('/api/chat/private', { method: 'POST', body: formData })
+            .then(res => res.json())
+            .then(data => {
+                if (data.code === 0) {
+                    document.getElementById('chatInput').value = '';
+                    document.getElementById('chatInput').style.height = 'auto';
+                    loadMessages();
+                } else {
+                    layer.msg(data.msg);
+                }
+            });
+    } else if (currentChatType === 'group') {
+        var formData = new FormData();
+        formData.append('action', 'send');
+        formData.append('group_id', currentChatId);
+        formData.append('content', content);
+        formData.append('_xsrf', xsrfToken);
+        
+        fetch('/api/group', { method: 'POST', body: formData })
+            .then(res => res.json())
+            .then(data => {
+                if (data.code === 0) {
+                    document.getElementById('chatInput').value = '';
+                    document.getElementById('chatInput').style.height = 'auto';
+                    setTimeout(loadMessages, 100);
+                } else {
+                    layer.msg(data.msg);
+                }
+            });
+    } else if (currentChatType === 'employee') {
+        addMessage({ from_user_id: 1, content: content, send_time: '刚刚' }, 'self');
+        document.getElementById('chatInput').value = '';
+        document.getElementById('chatInput').style.height = 'auto';
+        scrollToBottom();
+        
+        fetch('/api/group?action=employee_chat&employee_name=' + encodeURIComponent(currentChatId) + '&content=' + encodeURIComponent(content))
+            .then(res => res.json())
+            .then(data => {
+                if (data.code === 0) {
+                    addMessage({ 
+                        from_user_id: 0, 
+                        content: data.data.response, 
+                        send_time: '刚刚',
+                        from_username: data.data.employee_name 
+                    }, 'employee');
+                    scrollToBottom();
+                } else {
+                    layer.msg(data.msg || '回复失败');
+                }
+            }).catch(err => {
+                layer.msg('网络错误');
+            });
+    }
+}
+
+function addMessage(msg, type) {
+    var div = document.createElement('div');
+    
+    if (type === 'friend') {
+        div.className = 'message ' + (msg.from_user_id == currentChatId ? 'friend' : 'self');
+    } else if (type === 'group') {
+        div.className = 'message friend';
+    } else if (type === 'employee') {
+        div.className = 'message employee';
+    } else {
+        div.className = 'message self';
+    }
+    
+    var avatar = '👤';
+    if (type === 'friend' && msg.from_user_id == currentChatId) {
+        avatar = currentChatName.slice(0, 1).toUpperCase();
+    } else if (type === 'employee') {
+        avatar = currentChatName.slice(0, 1);
+    } else if (type === 'group' && msg.from_username) {
+        avatar = msg.from_username.slice(0, 1).toUpperCase();
+    }
+    
+    div.innerHTML = `
+        <div class="message-avatar">${avatar}</div>
+        <div>
+            ${type === 'group' && msg.from_username ? `<div style="font-size: 11px; color: #666; margin-bottom: 2px;">${msg.from_username}</div>` : ''}
+            <div class="message-content">${escapeHtml(msg.content)}</div>
+            <div class="message-time">${msg.send_time || '刚刚'}</div>
+        </div>
+    `;
+    document.getElementById('chatMessages').appendChild(div);
+}
+
+function scrollToBottom() {
+    var chatMessages = document.getElementById('chatMessages');
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+}
+
+function escapeHtml(text) {
+    var div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+function createGroupModal() {
+    document.getElementById('groupNameInput').value = '';
+    
+    fetch('/api/friend?action=list')
+        .then(res => res.json())
+        .then(data => {
+            var html = '';
+            if (data.code === 0 && data.data.length > 0) {
+                data.data.forEach(function(friend) {
+                    html += `
+                        <div class="friend-select-item" onclick="toggleFriendSelect(${friend.id})">
+                            <input type="checkbox" id="friend_${friend.id}" value="${friend.id}">
+                            <label for="friend_${friend.id}">${friend.username}</label>
+                        </div>
+                    `;
+                });
+            } else {
+                html = '<p style="color: #999;">暂无好友</p>';
+            }
+            document.getElementById('friendSelectList').innerHTML = html;
+        });
+    
+    fetch('/api/group?action=employees')
+        .then(res => res.json())
+        .then(data => {
+            var html = '';
+            if (data.code === 0 && data.data.length > 0) {
+                data.data.forEach(function(emp) {
+                    html += `
+                        <div class="employee-card" onclick="toggleEmployeeSelect('${emp.name}')">
+                            <div class="employee-avatar">${emp.avatar}</div>
+                            <div class="employee-name">${emp.name}</div>
+                        </div>
+                    `;
+                });
+            }
+            document.getElementById('employeeSelectList').innerHTML = html;
+        });
+    
+    document.getElementById('createGroupModal').classList.add('show');
+}
+
+function toggleFriendSelect(friendId) {
+    var checkbox = document.getElementById('friend_' + friendId);
+    checkbox.checked = !checkbox.checked;
+}
+
+function toggleEmployeeSelect(empName) {
+    var card = document.querySelector(`.employee-card:contains('${empName}')`);
+    if (card) card.classList.toggle('selected');
+}
+
+function createGroup() {
+    var name = document.getElementById('groupNameInput').value.trim();
+    if (!name) {
+        layer.msg('请输入群名称');
+        return;
+    }
+    
+    var selectedFriends = [];
+    document.querySelectorAll('.friend-select-item input:checked').forEach(function(checkbox) {
+        selectedFriends.push(parseInt(checkbox.value));
+    });
+    
+    var formData = new FormData();
+    formData.append('action', 'create');
+    formData.append('name', name);
+    formData.append('friend_ids', JSON.stringify(selectedFriends));
+    formData.append('_xsrf', xsrfToken);
+    
+    fetch('/api/group', { method: 'POST', body: formData })
+        .then(res => res.json())
+        .then(data => {
+            layer.msg(data.msg);
+            if (data.code === 0) {
+                closeModal('createGroupModal');
+                loadGroups();
+            }
+        });
+}
+
+function showMemberList() {
+    if (currentChatType !== 'group') {
+        layer.msg('请先选择一个群聊');
+        return;
+    }
+    
+    fetch('/api/group?action=members&group_id=' + currentChatId)
+        .then(res => res.json())
+        .then(data => {
+            if (data.code === 0) {
+                var html = '';
+                data.data.forEach(function(member) {
+                    html += `
+                        <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px; border-bottom: 1px solid #e8ecf0;">
+                            <div style="display: flex; align-items: center; gap: 10px;">
+                                <div class="contact-avatar default">${member.username.slice(0,1).toUpperCase()}</div>
+                                <div>
+                                    <div>${member.username}</div>
+                                    <div style="font-size: 12px; color: #999;">${member.role === 'admin' ? '管理员' : '成员'}</div>
+                                </div>
+                            </div>
+                            ${member.role !== 'admin' ? `
+                                <button class="btn-cancel" style="padding: 4px 10px; font-size: 12px;" 
+                                        onclick="removeGroupMember(${member.id})">移除</button>
+                            ` : ''}
+                        </div>
+                    `;
+                });
+                document.getElementById('memberList').innerHTML = html;
+                document.getElementById('memberListModal').classList.add('show');
+            }
+        });
+}
+
+function removeGroupMember(memberId) {
+    if (!confirm('确定移除该成员？')) return;
+    
+    var formData = new FormData();
+    formData.append('action', 'remove_member');
+    formData.append('group_id', currentChatId);
+    formData.append('member_id', memberId);
+    formData.append('_xsrf', xsrfToken);
+    
+    fetch('/api/group', { method: 'POST', body: formData })
+        .then(res => res.json())
+        .then(data => {
+            layer.msg(data.msg);
+            if (data.code === 0) {
+                showMemberList();
+            }
+        });
+}
+
+function selectFile() {
+    layer.msg('文件上传功能开发中');
+}
+
+function showCreateGroup() {
+    createGroupModal();
+}
+
+function closeModal(modalId) {
+    document.getElementById(modalId).classList.remove('show');
+}
+
+initEmojiGrid();
+loadFriends();
+
+setInterval(function() {
+    if (currentChatId && currentChatType !== 'employee') {
+        loadMessages();
+    }
+}, 5000);
+</script>
+</body>
+</html>

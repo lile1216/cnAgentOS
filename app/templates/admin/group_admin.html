@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>群管理 - cnAgentOS</title>
+    <link rel="stylesheet" href="/static/dist/layui-v2.13.6/layui/css/layui.css">
+    <style>
+        .layui-card { margin-bottom: 20px; }
+        .status-active { color: #10a37f; }
+        .status-inactive { color: #ff6b6b; }
+        .status-pending { color: #f5a623; }
+        .btn-group { display: flex; gap: 5px; }
+        .member-role { font-size: 12px; padding: 2px 6px; border-radius: 4px; }
+        .role-admin { background: #10a37f; color: #fff; }
+        .role-member { background: #e8ecf0; color: #666; }
+    </style>
+</head>
+<body>
+<div class="layui-container">
+    <div class="layui-row">
+        <div class="layui-col-md12">
+            <div class="layui-card">
+                <div class="layui-card-header">
+                    <h3>📊 群管理</h3>
+                </div>
+                <div class="layui-card-body">
+                    <table class="layui-table" id="groupTable">
+                        <thead>
+                            <tr>
+                                <th>群名称</th>
+                                <th>创建者</th>
+                                <th>成员数</th>
+                                <th>状态</th>
+                                <th>创建时间</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="groupTableBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="layui-layer layui-layer-page" id="memberModal" style="display: none;">
+    <div class="layui-card" style="width: 600px; margin: 20px;">
+        <div class="layui-card-header">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <h3>群成员列表</h3>
+                <button class="layui-btn layui-btn-sm layui-btn-danger" onclick="closeMemberModal()">关闭</button>
+            </div>
+        </div>
+        <div class="layui-card-body">
+            <table class="layui-table">
+                <thead>
+                    <tr>
+                        <th>用户名</th>
+                        <th>角色</th>
+                        <th>加入时间</th>
+                        <th>状态</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody id="memberTableBody"></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div class="layui-layer layui-layer-page" id="announcementModal" style="display: none;">
+    <div class="layui-card" style="width: 500px; margin: 20px;">
+        <div class="layui-card-header">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <h3>发布系统公告</h3>
+                <button class="layui-btn layui-btn-sm layui-btn-danger" onclick="closeAnnouncementModal()">关闭</button>
+            </div>
+        </div>
+        <div class="layui-card-body">
+            <div class="layui-form">
+                <div class="layui-form-item">
+                    <label class="layui-form-label">公告内容</label>
+                    <div class="layui-input-block">
+                        <textarea class="layui-textarea" id="announcementContent" placeholder="请输入公告内容"></textarea>
+                    </div>
+                </div>
+                <div class="layui-form-item">
+                    <button class="layui-btn" onclick="sendAnnouncement()">发布公告</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<input type="hidden" id="currentGroupId" value="">
+
+<script src="/static/dist/layui-v2.13.6/layui/layui.js"></script>
+<script>
+layui.use(['table', 'layer'], function() {
+    var layer = layui.layer;
+});
+
+function loadGroups() {
+    fetch('/api/admin/group?action=list')
+        .then(res => res.json())
+        .then(data => {
+            if (data.code === 0) {
+                var html = '';
+                data.data.forEach(function(group) {
+                    var statusClass = group.status === 'active' ? 'status-active' : 'status-inactive';
+                    var statusText = group.status === 'active' ? '正常' : '已解散';
+                    
+                    html += `
+                        <tr>
+                            <td>${group.avatar} ${group.name}</td>
+                            <td>${group.creator_name}</td>
+                            <td>${group.member_count}</td>
+                            <td><span class="${statusClass}">${statusText}</span></td>
+                            <td>${group.create_at}</td>
+                            <td>
+                                <div class="btn-group">
+                                    <button class="layui-btn layui-btn-xs" onclick="showMembers(${group.id})">成员</button>
+                                    <button class="layui-btn layui-btn-xs layui-btn-warm" onclick="showAnnouncementModal(${group.id})">公告</button>
+                                    <button class="layui-btn layui-btn-xs layui-btn-danger" onclick="dissolveGroup(${group.id})">解散</button>
+                                </div>
+                            </td>
+                        </tr>
+                    `;
+                });
+                document.getElementById('groupTableBody').innerHTML = html;
+            }
+        });
+}
+
+function showMembers(groupId) {
+    document.getElementById('currentGroupId').value = groupId;
+    
+    fetch('/api/admin/group?action=members&group_id=' + groupId)
+        .then(res => res.json())
+        .then(data => {
+            if (data.code === 0) {
+                var html = '';
+                data.data.forEach(function(member) {
+                    var roleClass = member.role === 'admin' ? 'role-admin' : 'role-member';
+                    var roleText = member.role === 'admin' ? '管理员' : '成员';
+                    var statusText = member.is_banned ? '已封禁' : member.is_muted ? '已禁言' : '正常';
+                    
+                    html += `
+                        <tr>
+                            <td>${member.username}</td>
+                            <td><span class="member-role ${roleClass}">${roleText}</span></td>
+                            <td>${member.join_time}</td>
+                            <td>${statusText}</td>
+                            <td>
+                                <div class="btn-group">
+                                    ${member.is_banned ? 
+                                        '<button class="layui-btn layui-btn-xs" onclick="unbanMember(' + groupId + ', ' + member.id + ')">解封</button>' :
+                                        '<button class="layui-btn layui-btn-xs layui-btn-danger" onclick="banMember(' + groupId + ', ' + member.id + ')">封禁</button>'
+                                    }
+                                </div>
+                            </td>
+                        </tr>
+                    `;
+                });
+                document.getElementById('memberTableBody').innerHTML = html;
+                document.getElementById('memberModal').style.display = 'block';
+            }
+        });
+}
+
+function closeMemberModal() {
+    document.getElementById('memberModal').style.display = 'none';
+}
+
+function showAnnouncementModal(groupId) {
+    document.getElementById('currentGroupId').value = groupId;
+    document.getElementById('announcementContent').value = '';
+    document.getElementById('announcementModal').style.display = 'block';
+}
+
+function closeAnnouncementModal() {
+    document.getElementById('announcementModal').style.display = 'none';
+}
+
+function sendAnnouncement() {
+    var groupId = document.getElementById('currentGroupId').value;
+    var content = document.getElementById('announcementContent').value.trim();
+    
+    if (!content) {
+        layer.msg('请输入公告内容');
+        return;
+    }
+    
+    var formData = new FormData();
+    formData.append('action', 'send_announcement');
+    formData.append('group_id', groupId);
+    formData.append('content', content);
+    
+    fetch('/api/admin/group', { method: 'POST', body: formData })
+        .then(res => res.json())
+        .then(data => {
+            layer.msg(data.msg);
+            if (data.code === 0) {
+                closeAnnouncementModal();
+            }
+        });
+}
+
+function dissolveGroup(groupId) {
+    if (!confirm('确定解散该群？此操作不可恢复！')) return;
+    
+    var formData = new FormData();
+    formData.append('action', 'dissolve');
+    formData.append('group_id', groupId);
+    
+    fetch('/api/admin/group', { method: 'POST', body: formData })
+        .then(res => res.json())
+        .then(data => {
+            layer.msg(data.msg);
+            if (data.code === 0) {
+                loadGroups();
+            }
+        });
+}
+
+function banMember(groupId, memberId) {
+    if (!confirm('确定封禁该成员？')) return;
+    
+    var formData = new FormData();
+    formData.append('action', 'ban_member');
+    formData.append('group_id', groupId);
+    formData.append('member_id', memberId);
+    
+    fetch('/api/admin/group', { method: 'POST', body: formData })
+        .then(res => res.json())
+        .then(data => {
+            layer.msg(data.msg);
+            if (data.code === 0) {
+                showMembers(groupId);
+            }
+        });
+}
+
+function unbanMember(groupId, memberId) {
+    var formData = new FormData();
+    formData.append('action', 'unban_member');
+    formData.append('group_id', groupId);
+    formData.append('member_id', memberId);
+    
+    fetch('/api/admin/group', { method: 'POST', body: formData })
+        .then(res => res.json())
+        .then(data => {
+            layer.msg(data.msg);
+            if (data.code === 0) {
+                showMembers(groupId);
+            }
+        });
+}
+
+loadGroups();
+</script>
+</body>
+</html>

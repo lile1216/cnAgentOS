@@ -155,6 +155,9 @@ layui.use(['table', 'layer', 'form'], function(){
                 "count": res.count,
                 "data": res.data
             };
+        },
+        error: function(res, msg){
+            layer.msg('请求异常：' + msg, {icon: 2});
         }
     });
     

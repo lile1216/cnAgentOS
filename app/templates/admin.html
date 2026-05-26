@@ -106,6 +106,24 @@
             margin-right: 8px;
             font-size: 14px;
         }
+        /* 语音开关图标样式 */
+        .voice-toggle {
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 24px !important;
+            padding: 0 10px;
+            border-radius: 50%;
+        }
+        .voice-toggle:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+        .voice-on {
+            color: #52c41a;
+        }
+        .voice-off {
+            color: #999;
+        }
+        
         /* 欢迎页面样式 */
         .welcome-container {
             padding: 30px;
@@ -208,6 +226,11 @@
             
             <!-- 右侧导航 -->
             <ul class="layui-nav layui-layout-right">
+                <li class="layui-nav-item">
+                    <a href="javascript:void(0)" id="voiceToggle" class="voice-toggle voice-on" title="语音开关">
+                        <span id="voiceIcon">🔊</span>
+                    </a>
+                </li>
                 <li class="layui-nav-item">
                     <a href="javascript:void(0)" id="refreshBtn">
                         <i class="layui-icon layui-icon-refresh"></i>
@@ -345,12 +368,31 @@
                         </dl>
                     </li>
                     
-                    <!-- 智能通信 -->
+                    <!-- 智能聊天 -->
                     <li class="layui-nav-item">
-                        <a href="javascript:void(0)" data-url="/wechat-chat/contacts">
+                        <a href="javascript:void(0)">
                             <i class="layui-icon layui-icon-chat"></i>
-                            智能通信
+                            智能聊天
                         </a>
+                        <dl class="layui-nav-child">
+                            <dd><a href="javascript:void(0)" data-url="/chat">AI对话</a></dd>
+                            <dd><a href="javascript:void(0)" data-url="/chat/friend">好友聊天</a></dd>
+                            <dd><a href="javascript:void(0)" data-url="/chat/system">智能聊天系统</a></dd>
+                            <dd><a href="javascript:void(0)" data-url="/wechat-chat/contacts">微信客服</a></dd>
+                        </dl>
+                    </li>
+                    
+                    <!-- 聊天管理 -->
+                    <li class="layui-nav-item">
+                        <a href="javascript:void(0)">
+                            <i class="layui-icon layui-icon-set"></i>
+                            聊天管理
+                        </a>
+                        <dl class="layui-nav-child">
+                            <dd><a href="javascript:void(0)" data-url="/admin/group">群管理</a></dd>
+                            <dd><a href="javascript:void(0)" data-url="/admin/file">文件管理</a></dd>
+                            <dd><a href="javascript:void(0)" data-url="/admin/server">服务器管理</a></dd>
+                        </dl>
                     </li>
                 </ul>
             </div>
@@ -436,6 +478,7 @@
     </div>
     
     <script src="/static/dist/layui-v2.13.6/layui/layui.js"></script>
+    <script src="/static/js/common.js"></script>
     <script>
         layui.use(['element', 'layer'], function() {
             var element = layui.element;
@@ -505,6 +548,31 @@
                 if (!document.fullscreenElement) {
                     $('#fullscreenBtn').html('<i class="layui-icon layui-icon-screen-full"></i> 全屏');
                 }
+            });
+            
+            // 语音开关
+            $('#voiceToggle').click(function() {
+                var isEnabled = VoiceManager.voiceToggle();
+                var $icon = $('#voiceIcon');
+                var $toggle = $('#voiceToggle');
+                
+                if (isEnabled) {
+                    $icon.text('🔊');
+                    $toggle.removeClass('voice-off').addClass('voice-on');
+                    layer.msg('语音已开启', {icon: 1});
+                    VoiceHelper.sayInfo('语音已开启');
+                } else {
+                    $icon.text('🔇');
+                    $toggle.removeClass('voice-on').addClass('voice-off');
+                    layer.msg('语音已关闭', {icon: 2});
+                }
+            });
+            
+            // 页面加载完成后欢迎语
+            $(document).ready(function() {
+                setTimeout(function() {
+                    VoiceHelper.sayWelcome('{{ current_user }}');
+                }, 1500);
             });
         });
     </script>

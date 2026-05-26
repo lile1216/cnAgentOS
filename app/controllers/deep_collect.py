@@ -6,6 +6,7 @@ import re
 from datetime import datetime
 from urllib.parse import urlparse
 import os
+import requests
 
 os.environ['CRAWL4AI_DB_PATH'] = os.path.join(os.path.dirname(__file__), '..', '..', 'data', 'crawl4ai')
 os.environ['CRAWL4AI_CACHE_DIR'] = os.path.join(os.path.dirname(__file__), '..', '..', 'data', 'crawl4ai', 'cache')
@@ -20,7 +21,7 @@ try:
     CRAWL4AI_AVAILABLE = True
 except Exception as e:
     CRAWL4AI_AVAILABLE = False
-    print(f"警告: crawl4ai 不可用，AI深度采集功能将不可用。错误: {e}")
+    print(f"警告: crawl4ai 不可用，将使用requests作为备选方案。错误: {e}")
 
 from app.controllers.base import BaseHandler
 from app.models.warehouse import ScoutRecordRepository, ScoutDetailRepository
@@ -57,13 +58,6 @@ class DeepCollectApiHandler(BaseHandler):
 
     def _deep_collect(self):
         """执行深度采集"""
-        if not CRAWL4AI_AVAILABLE:
-            self.write(json.dumps({
-                "code": 1,
-                "msg": "crawl4ai未安装，请先运行 python setup_crawl4ai.py"
-            }))
-            return
-
         url = self.get_body_argument("url", "").strip()
         headless = self.get_body_argument("headless", "true").lower() == "true"
         js_enabled = self.get_body_argument("js_enabled", "true").lower() == "true"
@@ -80,7 +74,12 @@ class DeepCollectApiHandler(BaseHandler):
             return
 
         try:
-            result = self._run_crawl_sync(url, headless, js_enabled, wait_for, max_depth)
+            result = None
+            
+            if CRAWL4AI_AVAILABLE:
+                result = self._run_crawl_sync(url, headless, js_enabled, wait_for, max_depth)
+            else:
+                result = self._run_requests_crawl(url)
 
             if result["success"]:
                 record_id = ScoutRecordRepository.create(
@@ -119,16 +118,67 @@ class DeepCollectApiHandler(BaseHandler):
                 "code": 1,
                 "msg": f"采集异常: {str(e)}"
             }))
+    
+    def _run_requests_crawl(self, url):
+        """使用requests进行简单采集（备选方案）"""
+        start_time = datetime.now()
+        
+        try:
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+                'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
+                'Accept-Encoding': 'gzip, deflate',
+                'Connection': 'keep-alive'
+            }
+            
+            response = requests.get(url, headers=headers, timeout=30)
+            response.encoding = response.apparent_encoding
+            html = response.text
+            
+            title = self._extract_title(html)
+            links = self._extract_links(html)
+            images = self._extract_images(html)
+            media = self._extract_media(html)
+            
+            meta_desc = ""
+            meta_match = re.search(r'<meta[^>]+name="description"[^>]+content="([^"]*)"', html, re.IGNORECASE)
+            if meta_match:
+                meta_desc = meta_match.group(1)
+            else:
+                meta_match = re.search(r'<meta[^>]+content="([^"]*)"[^>]+name="description"', html, re.IGNORECASE)
+                if meta_match:
+                    meta_desc = meta_match.group(1)
+            
+            html_content = html
+            html_content = re.sub(r'<script[^>]*>.*?</script>', '', html_content, flags=re.DOTALL)
+            html_content = re.sub(r'<style[^>]*>.*?</style>', '', html_content, flags=re.DOTALL)
+            html_content = re.sub(r'<[^>]+>', '', html_content)
+            html_content = ' '.join(html_content.split())
+            content = html_content[:5000]
+            
+            crawl_time = (datetime.now() - start_time).total_seconds()
+            
+            return {
+                "success": True,
+                "html": html,
+                "content": content,
+                "title": title,
+                "meta_description": meta_desc,
+                "links": links[:50],
+                "images": images[:20],
+                "media": media,
+                "crawl_time": round(crawl_time, 2)
+            }
+            
+        except Exception as e:
+            return {
+                "success": False,
+                "error": str(e)
+            }
 
     def _batch_deep_collect(self):
         """批量深度采集"""
-        if not CRAWL4AI_AVAILABLE:
-            self.write(json.dumps({
-                "code": 1,
-                "msg": "crawl4ai未安装，请先运行 python setup_crawl4ai.py"
-            }))
-            return
-
         urls_str = self.get_body_argument("urls", "").strip()
         headless = self.get_body_argument("headless", "true").lower() == "true"
         js_enabled = self.get_body_argument("js_enabled", "true").lower() == "true"
@@ -156,7 +206,12 @@ class DeepCollectApiHandler(BaseHandler):
 
         for url in valid_urls:
             try:
-                result = self._run_crawl_sync(url, headless, js_enabled, wait_for, 1)
+                result = None
+                
+                if CRAWL4AI_AVAILABLE:
+                    result = self._run_crawl_sync(url, headless, js_enabled, wait_for, 1)
+                else:
+                    result = self._run_requests_crawl(url)
 
                 if result["success"]:
                     record_id = ScoutRecordRepository.create(

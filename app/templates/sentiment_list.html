@@ -238,8 +238,9 @@
     </div>
 
     <script src="/static/dist/layui-v2.13.6/layui/layui.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/echarts-wordcloud@2.1.0/dist/echarts-wordcloud.min.js"></script>
+<script src="/static/js/common.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/echarts-wordcloud@2.1.0/dist/echarts-wordcloud.min.js"></script>
     <script>
         layui.use(['table', 'form', 'layer', 'laydate'], function(){
             var table = layui.table;
@@ -265,6 +266,8 @@
                 });
             }
 
+            var previousHighRiskCount = 0;
+
             function loadStats() {
                 var days = $('#daysSelect').val();
                 $.get('/api/sentiment/stats?type=all&days=' + days + '&cache=false')
@@ -287,6 +290,11 @@
                                 if (item.risk_level === 'high') highRisk = item.count;
                             });
                             $('#highRiskCount').text(highRisk);
+
+                            if (highRisk > previousHighRiskCount && highRisk > 0) {
+                                VoiceHelper.sayWarning('检测到舆情风险，请及时查看');
+                            }
+                            previousHighRiskCount = highRisk;
 
                             renderSentimentChart(stats.by_sentiment || []);
                             renderTimelineChart(data.timeline || []);
@@ -515,14 +523,17 @@
                         layer.close(index);
                         if (res.code === 0) {
                             layer.msg(res.msg, {icon: 1});
+                            VoiceHelper.sayInfo('舆情分析已完成');
                             loadTableData(1);
                             loadStats();
                         } else {
                             layer.msg('分析失败: ' + res.msg, {icon: 2});
+                            VoiceHelper.sayError('分析失败');
                         }
                     }).fail(function(){
                         layer.close(index);
                         layer.msg('网络错误', {icon: 2});
+                        VoiceHelper.sayError('网络错误');
                     });
                 });
             });

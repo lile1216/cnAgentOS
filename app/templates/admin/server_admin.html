@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>服务器管理 - cnAgentOS</title>
+    <link rel="stylesheet" href="/static/dist/layui-v2.13.6/layui/css/layui.css">
+    <style>
+        .layui-card { margin-bottom: 20px; }
+        .status-active { color: #10a37f; }
+        .status-inactive { color: #ff6b6b; }
+        .is-default { background: #10a37f; color: #fff; font-size: 12px; padding: 2px 6px; border-radius: 4px; }
+    </style>
+</head>
+<body>
+<div class="layui-container">
+    <div class="layui-row">
+        <div class="layui-col-md12">
+            <div class="layui-card">
+                <div class="layui-card-header">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <h3>🖥️ 服务器管理</h3>
+                        <button class="layui-btn layui-btn-sm" onclick="showAddServerModal()">添加服务器</button>
+                    </div>
+                </div>
+                <div class="layui-card-body">
+                    <table class="layui-table" id="serverTable">
+                        <thead>
+                            <tr>
+                                <th>名称</th>
+                                <th>地址</th>
+                                <th>协议</th>
+                                <th>状态</th>
+                                <th>权重</th>
+                                <th>默认</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="serverTableBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="layui-layer layui-layer-page" id="serverModal" style="display: none;">
+    <div class="layui-card" style="width: 500px; margin: 20px;">
+        <div class="layui-card-header">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <h3 id="modalTitle">添加服务器</h3>
+                <button class="layui-btn layui-btn-sm layui-btn-danger" onclick="closeServerModal()">关闭</button>
+            </div>
+        </div>
+        <div class="layui-card-body">
+            <div class="layui-form">
+                <input type="hidden" id="serverIdInput" value="">
+                <div class="layui-form-item">
+                    <label class="layui-form-label">服务器名称</label>
+                    <div class="layui-input-block">
+                        <input type="text" class="layui-input" id="serverNameInput" placeholder="请输入服务器名称">
+                    </div>
+                </div>
+                <div class="layui-form-item">
+                    <label class="layui-form-label">主机地址</label>
+                    <div class="layui-input-block">
+                        <input type="text" class="layui-input" id="serverHostInput" placeholder="请输入主机地址">
+                    </div>
+                </div>
+                <div class="layui-form-item">
+                    <label class="layui-form-label">端口</label>
+                    <div class="layui-input-block">
+                        <input type="number" class="layui-input" id="serverPortInput" value="80">
+                    </div>
+                </div>
+                <div class="layui-form-item">
+                    <label class="layui-form-label">协议</label>
+                    <div class="layui-input-block">
+                        <select class="layui-input" id="serverProtocolInput">
+                            <option value="http">HTTP</option>
+                            <option value="https">HTTPS</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="layui-form-item">
+                    <label class="layui-form-label">描述</label>
+                    <div class="layui-input-block">
+                        <textarea class="layui-textarea" id="serverDescInput" placeholder="请输入服务器描述"></textarea>
+                    </div>
+                </div>
+                <div class="layui-form-item">
+                    <button class="layui-btn" onclick="saveServer()">保存</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="/static/dist/layui-v2.13.6/layui/layui.js"></script>
+<script>
+layui.use(['layer'], function() {
+    var layer = layui.layer;
+});
+
+function loadServers() {
+    fetch('/api/admin/server?action=list')
+        .then(res => res.json())
+        .then(data => {
+            if (data.code === 0) {
+                var html = '';
+                if (data.data.length === 0) {
+                    html = '<tr><td colspan="7" style="text-align: center;">暂无服务器配置</td></tr>';
+                } else {
+                    data.data.forEach(function(server) {
+                        var statusClass = server.is_active ? 'status-active' : 'status-inactive';
+                        var statusText = server.is_active ? '运行中' : '已停用';
+                        var defaultText = server.is_default ? '<span class="is-default">默认</span>' : '';
+                        
+                        html += `
+                            <tr>
+                                <td>${server.name}</td>
+                                <td>${server.host}:${server.port}</td>
+                                <td>${server.protocol.toUpperCase()}</td>
+                                <td><span class="${statusClass}">${statusText}</span></td>
+                                <td>${server.weight}</td>
+                                <td>${defaultText}</td>
+                                <td>
+                                    <button class="layui-btn layui-btn-xs" onclick="editServer(${server.id})">编辑</button>
+                                    <button class="layui-btn layui-btn-xs ${server.is_active ? 'layui-btn-warm' : 'layui-btn-normal'}" 
+                                            onclick="toggleServer(${server.id})">
+                                        ${server.is_active ? '停用' : '启用'}
+                                    </button>
+                                    <button class="layui-btn layui-btn-xs layui-btn-danger" onclick="deleteServer(${server.id})">删除</button>
+                                </td>
+                            </tr>
+                        `;
+                    });
+                }
+                document.getElementById('serverTableBody').innerHTML = html;
+            }
+        });
+}
+
+function showAddServerModal() {
+    document.getElementById('modalTitle').textContent = '添加服务器';
+    document.getElementById('serverIdInput').value = '';
+    document.getElementById('serverNameInput').value = '';
+    document.getElementById('serverHostInput').value = '';
+    document.getElementById('serverPortInput').value = '80';
+    document.getElementById('serverProtocolInput').value = 'http';
+    document.getElementById('serverDescInput').value = '';
+    document.getElementById('serverModal').style.display = 'block';
+}
+
+function editServer(serverId) {
+    fetch('/api/admin/server?action=list')
+        .then(res => res.json())
+        .then(data => {
+            if (data.code === 0) {
+                var server = data.data.find(s => s.id === serverId);
+                if (server) {
+                    document.getElementById('modalTitle').textContent = '编辑服务器';
+                    document.getElementById('serverIdInput').value = server.id;
+                    document.getElementById('serverNameInput').value = server.name;
+                    document.getElementById('serverHostInput').value = server.host;
+                    document.getElementById('serverPortInput').value = server.port;
+                    document.getElementById('serverProtocolInput').value = server.protocol;
+                    document.getElementById('serverDescInput').value = server.description || '';
+                    document.getElementById('serverModal').style.display = 'block';
+                }
+            }
+        });
+}
+
+function closeServerModal() {
+    document.getElementById('serverModal').style.display = 'none';
+}
+
+function saveServer() {
+    var id = document.getElementById('serverIdInput').value;
+    var name = document.getElementById('serverNameInput').value.trim();
+    var host = document.getElementById('serverHostInput').value.trim();
+    var port = document.getElementById('serverPortInput').value;
+    var protocol = document.getElementById('serverProtocolInput').value;
+    var desc = document.getElementById('serverDescInput').value.trim();
+    
+    if (!name || !host) {
+        layer.msg('请填写服务器名称和主机地址');
+        return;
+    }
+    
+    var formData = new FormData();
+    if (id) {
+        formData.append('action', 'update');
+        formData.append('server_id', id);
+    } else {
+        formData.append('action', 'create');
+    }
+    formData.append('name', name);
+    formData.append('host', host);
+    formData.append('port', port);
+    formData.append('protocol', protocol);
+    formData.append('description', desc);
+    
+    fetch('/api/admin/server', { method: 'POST', body: formData })
+        .then(res => res.json())
+        .then(data => {
+            layer.msg(data.msg);
+            if (data.code === 0) {
+                closeServerModal();
+                loadServers();
+            }
+        });
+}
+
+function toggleServer(serverId) {
+    var formData = new FormData();
+    formData.append('action', 'toggle');
+    formData.append('server_id', serverId);
+    
+    fetch('/api/admin/server', { method: 'POST', body: formData })
+        .then(res => res.json())
+        .then(data => {
+            layer.msg(data.msg);
+            if (data.code === 0) {
+                loadServers();
+            }
+        });
+}
+
+function deleteServer(serverId) {
+    if (!confirm('确定删除该服务器？')) return;
+    
+    var formData = new FormData();
+    formData.append('action', 'delete');
+    formData.append('server_id', serverId);
+    
+    fetch('/api/admin/server', { method: 'POST', body: formData })
+        .then(res => res.json())
+        .then(data => {
+            layer.msg(data.msg);
+            if (data.code === 0) {
+                loadServers();
+            }
+        });
+}
+
+loadServers();
+</script>
+</body>
+</html>

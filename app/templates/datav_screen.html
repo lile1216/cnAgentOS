@@ -8,6 +8,7 @@
     <script src="https://cdn.jsdelivr.net/npm/echarts-gl@2.0.9/dist/echarts-gl.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/echarts-wordcloud@2.1.0/dist/echarts-wordcloud.min.js"></script>
     <script src="/static/dist/jquery-3.6.0/jquery.min.js"></script>
+    <script src="/static/js/common.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -381,6 +382,8 @@
         var isLoading = false;
         var loadCount = 0;
         var totalLoadTasks = 4;
+        var previousHighRiskCount = 0;
+        var firstLoadCompleted = false;
 
         function updateTime() {
             var now = new Date();
@@ -426,6 +429,12 @@
             ).done(function() {
                 document.getElementById('refreshTime').textContent = new Date().toLocaleTimeString();
                 isLoading = false;
+                
+                if (!firstLoadCompleted) {
+                    VoiceHelper.sayInfo('舆情分析已完成');
+                    firstLoadCompleted = true;
+                }
+                
                 setTimeout(function() {
                     document.getElementById('loadingOverlay').style.display = 'none';
                 }, 300);
@@ -469,6 +478,11 @@
                         if (item.risk_level === 'high') highRisk = item.count;
                     });
                     document.getElementById('highRiskCount').textContent = highRisk;
+
+                    if (highRisk > previousHighRiskCount && highRisk > 0) {
+                        VoiceHelper.sayWarning('检测到舆情风险，请及时查看');
+                    }
+                    previousHighRiskCount = highRisk;
 
                     renderSentimentPie(stats.by_sentiment || []);
                     renderSourceBar(stats.by_source || []);

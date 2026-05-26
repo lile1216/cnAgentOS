@@ -43,23 +43,31 @@ class EmployeeApiHandler(BaseHandler):
             page = 1
             page_size = 20
         
-        employees = DigitalEmployeeRepository.get_all(page, page_size)
-        total = DigitalEmployeeRepository.get_total_count()
-        
-        for emp in employees:
-            if emp.get("model_id"):
-                model = ModelServiceRepository.get_by_id(emp["model_id"])
-                emp["model_name"] = model["name"] if model else None
-            if emp.get("api_interface_id"):
-                api = ApiInterfaceRepository.get_by_id(emp["api_interface_id"])
-                emp["api_name"] = api["name"] if api else None
-        
-        self.write(json.dumps({
-            "code": 0,
-            "msg": "success",
-            "count": total,
-            "data": employees
-        }))
+        try:
+            employees = DigitalEmployeeRepository.get_all(page, page_size)
+            total = DigitalEmployeeRepository.get_total_count()
+            
+            for emp in employees:
+                if emp.get("model_id"):
+                    model = ModelServiceRepository.get_by_id(emp["model_id"])
+                    emp["model_name"] = model["name"] if model else None
+                if emp.get("api_interface_id"):
+                    api = ApiInterfaceRepository.get_by_id(emp["api_interface_id"])
+                    emp["api_name"] = api["name"] if api else None
+            
+            self.write(json.dumps({
+                "code": 0,
+                "msg": "success",
+                "count": total,
+                "data": employees
+            }))
+        except Exception as e:
+            self.write(json.dumps({
+                "code": 1,
+                "msg": f"获取数据失败: {str(e)}",
+                "count": 0,
+                "data": []
+            }))
 
     @tornado.web.authenticated
     def post(self):

@@ -185,6 +185,7 @@
 <input type="hidden" id="currentModelId" value="{{ default_model['id'] if default_model else '' }}">
 
 <script src="/static/dist/layui-v2.13.6/layui/layui.js"></script>
+<script src="/static/js/common.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.0/marked.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
 <script>
@@ -314,40 +315,54 @@ function sendMessage() {
         var fullContent = '';
         
         function readStream() {
-            reader.read().then(function(result) {
-                if (result.done) {
-                    isStreaming = false;
-                    sendBtn.disabled = false;
-                    return;
-                }
-                
-                var chunk = decoder.decode(result.value, {stream: true});
-                var lines = chunk.split('\n');
-                
-                lines.forEach(function(line) {
-                    if (line.startsWith('data: ')) {
-                        var data = line.substring(6);
-                        if (data === '[DONE]') {
+                    reader.read().then(function(result) {
+                        if (result.done) {
                             isStreaming = false;
                             sendBtn.disabled = false;
-                            loadSessions();
                             return;
                         }
                         
-                        try {
-                            var json = JSON.parse(data);
-                            if (json.content) {
-                                fullContent += json.content;
-                                contentDiv.innerHTML = marked.parse(fullContent);
-                                chatMessages.scrollTop = chatMessages.scrollHeight;
+                        var chunk = decoder.decode(result.value, {stream: true});
+                        var lines = chunk.split('\n');
+                        
+                        lines.forEach(function(line) {
+                            if (line.startsWith('data: ')) {
+                                var data = line.substring(6);
+                                if (data === '[DONE]') {
+                                    isStreaming = false;
+                                    sendBtn.disabled = false;
+                                    loadSessions();
+                                    if (fullContent && fullContent.trim()) {
+                                        var speakContent = getShortContent(fullContent.trim());
+                                        VoiceHelper.sayInfo(speakContent);
+                                    }
+                                    return;
+                                }
+                                
+                                try {
+                                    var json = JSON.parse(data);
+                                    if (json.content) {
+                                        fullContent += json.content;
+                                        contentDiv.innerHTML = marked.parse(fullContent);
+                                        chatMessages.scrollTop = chatMessages.scrollHeight;
+                                    }
+                                } catch (e) {}
                             }
-                        } catch (e) {}
-                    }
-                });
+                        });
+                        
+                        readStream();
+                    });
+                }
                 
-                readStream();
-            });
-        }
+                function getShortContent(content) {
+                    content = content.replace(/[#*`>\-\[\]()]/g, '');
+                    content = content.replace(/\s+/g, ' ');
+                    content = content.trim();
+                    if (content.length > 50) {
+                        content = content.substring(0, 50) + '...';
+                    }
+                    return content;
+                }
         
         readStream();
     }).catch(function(error) {
@@ -432,6 +447,41 @@ sessionItems.forEach(function(item) {
         }
     });
 });
+
+function simulateNewMessage() {
+    VoiceHelper.sayInfo('您有一条新消息');
+    layer.msg('收到新消息', {icon: 6});
+}
+
+function simulateMentioned() {
+    VoiceHelper.sayInfo('您在群聊中被提及');
+    layer.msg('您被@了', {icon: 5});
+}
+
+function simulateFileSent() {
+    VoiceHelper.sayInfo('文件发送成功');
+    layer.msg('文件发送成功', {icon: 1});
+}
+
+function simulateFriendRequestApproved() {
+    VoiceHelper.sayInfo('好友请求已通过');
+    layer.msg('好友请求已通过', {icon: 1});
+}
+
+window.addEventListener('focus', function() {
+    if (hasNewMessage && !document.hidden) {
+        VoiceHelper.sayInfo('您有一条新消息');
+        hasNewMessage = false;
+    }
+});
+
+var hasNewMessage = false;
+
+setInterval(function() {
+    if (!document.hasFocus() && Math.random() < 0.02) {
+        hasNewMessage = true;
+    }
+}, 3000);
 </script>
 </body>
 </html>

@@ -254,6 +254,7 @@
     </div>
 
     <script src="/static/dist/layui-v2.13.6/layui/layui.js"></script>
+    <script src="/static/js/common.js"></script>
     <script>
         layui.use(['layer', 'form'], function() {
             var layer = layui.layer;
@@ -314,6 +315,7 @@
                         if (data.done) {
                             eventSource.close();
                             $('#sendBtn').prop('disabled', false);
+                            VoiceHelper.sayInfo('数据查询完成');
                         } else if (data.content) {
                             appendToMessage(messageId, data.content);
                         }
@@ -327,6 +329,7 @@
                     eventSource.close();
                     $('#sendBtn').prop('disabled', false);
                     appendToMessage(messageId, '\n\n连接错误，请重试');
+                    VoiceHelper.sayError('查询失败，请重试');
                 };
             }
 

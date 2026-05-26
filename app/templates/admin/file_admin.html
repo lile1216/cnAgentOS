@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>文件管理 - cnAgentOS</title>
+    <link rel="stylesheet" href="/static/dist/layui-v2.13.6/layui/css/layui.css">
+    <style>
+        .layui-card { margin-bottom: 20px; }
+        .file-size { font-size: 12px; color: #999; }
+        .file-type { font-size: 12px; padding: 2px 6px; border-radius: 4px; background: #e8ecf0; color: #666; }
+    </style>
+</head>
+<body>
+<div class="layui-container">
+    <div class="layui-row">
+        <div class="layui-col-md12">
+            <div class="layui-card">
+                <div class="layui-card-header">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <h3>📁 文件管理</h3>
+                        <button class="layui-btn layui-btn-sm" onclick="refreshFiles()">刷新</button>
+                    </div>
+                </div>
+                <div class="layui-card-body">
+                    <table class="layui-table" id="fileTable">
+                        <thead>
+                            <tr>
+                                <th>文件名</th>
+                                <th>类型</th>
+                                <th>大小</th>
+                                <th>上传者</th>
+                                <th>上传时间</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="fileTableBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="/static/dist/layui-v2.13.6/layui/layui.js"></script>
+<script>
+layui.use(['layer'], function() {
+    var layer = layui.layer;
+});
+
+function formatFileSize(bytes) {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(2) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
+}
+
+function loadFiles() {
+    fetch('/api/admin/file?action=list')
+        .then(res => res.json())
+        .then(data => {
+            if (data.code === 0) {
+                var html = '';
+                if (data.data.length === 0) {
+                    html = '<tr><td colspan="6" style="text-align: center;">暂无文件</td></tr>';
+                } else {
+                    data.data.forEach(function(file) {
+                        var ext = file.file_name.split('.').pop().toUpperCase();
+                        html += `
+                            <tr>
+                                <td>${file.file_name}</td>
+                                <td><span class="file-type">${ext}</span></td>
+                                <td class="file-size">${formatFileSize(file.file_size)}</td>
+                                <td>${file.uploader_id || '系统'}</td>
+                                <td>${file.upload_time}</td>
+                                <td>
+                                    <button class="layui-btn layui-btn-xs layui-btn-danger" onclick="deleteFile(${file.id})">删除</button>
+                                </td>
+                            </tr>
+                        `;
+                    });
+                }
+                document.getElementById('fileTableBody').innerHTML = html;
+            }
+        });
+}
+
+function deleteFile(fileId) {
+    if (!confirm('确定删除该文件？')) return;
+    
+    var formData = new FormData();
+    formData.append('action', 'delete');
+    formData.append('file_id', fileId);
+    
+    fetch('/api/admin/file', { method: 'POST', body: formData })
+        .then(res => res.json())
+        .then(data => {
+            layer.msg(data.msg);
+            if (data.code === 0) {
+                loadFiles();
+            }
+        });
+}
+
+function refreshFiles() {
+    loadFiles();
+}
+
+loadFiles();
+</script>
+</body>
+</html>

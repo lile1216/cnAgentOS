@@ -279,6 +279,158 @@ def init_db():
 			"""
 		)
 
+		conn.execute(
+			"""
+			CREATE TABLE IF NOT EXISTS friendship(
+				id integer PRIMARY KEY AUTOINCREMENT,
+				user_id INTEGER NOT NULL,
+				friend_id INTEGER NOT NULL,
+				status TEXT DEFAULT 'pending',
+				create_at TEXT NOT NULL DEFAULT(datetime('now')),
+				update_at TEXT NOT NULL DEFAULT(datetime('now')),
+				FOREIGN KEY (user_id) REFERENCES user(id) ON DELETE CASCADE,
+				FOREIGN KEY (friend_id) REFERENCES user(id) ON DELETE CASCADE,
+				UNIQUE(user_id, friend_id)
+			)
+			"""
+		)
+
+		conn.execute(
+			"""
+			CREATE TABLE IF NOT EXISTS private_message(
+				id integer PRIMARY KEY AUTOINCREMENT,
+				from_user_id INTEGER NOT NULL,
+				to_user_id INTEGER NOT NULL,
+				content TEXT NOT NULL,
+				is_read INTEGER DEFAULT 0,
+				send_time TEXT NOT NULL DEFAULT(datetime('now')),
+				FOREIGN KEY (from_user_id) REFERENCES user(id) ON DELETE CASCADE,
+				FOREIGN KEY (to_user_id) REFERENCES user(id) ON DELETE CASCADE
+			)
+			"""
+		)
+
+		conn.execute(
+			"""
+			CREATE TABLE IF NOT EXISTS group_chat(
+				id integer PRIMARY KEY AUTOINCREMENT,
+				name TEXT NOT NULL,
+				avatar TEXT DEFAULT '👥',
+				description TEXT,
+				creator_id INTEGER NOT NULL,
+				status TEXT DEFAULT 'active',
+				is_public INTEGER DEFAULT 0,
+				max_members INTEGER DEFAULT 200,
+				create_at TEXT NOT NULL DEFAULT(datetime('now')),
+				update_at TEXT NOT NULL DEFAULT(datetime('now')),
+				FOREIGN KEY (creator_id) REFERENCES user(id) ON DELETE CASCADE
+			)
+			"""
+		)
+
+		conn.execute(
+			"""
+			CREATE TABLE IF NOT EXISTS group_member(
+				id integer PRIMARY KEY AUTOINCREMENT,
+				group_id INTEGER NOT NULL,
+				user_id INTEGER NOT NULL,
+				role TEXT DEFAULT 'member',
+				join_time TEXT NOT NULL DEFAULT(datetime('now')),
+				last_active TEXT,
+				is_muted INTEGER DEFAULT 0,
+				is_banned INTEGER DEFAULT 0,
+				FOREIGN KEY (group_id) REFERENCES group_chat(id) ON DELETE CASCADE,
+				FOREIGN KEY (user_id) REFERENCES user(id) ON DELETE CASCADE,
+				UNIQUE(group_id, user_id)
+			)
+			"""
+		)
+
+		conn.execute(
+			"""
+			CREATE TABLE IF NOT EXISTS group_message(
+				id integer PRIMARY KEY AUTOINCREMENT,
+				group_id INTEGER NOT NULL,
+				from_user_id INTEGER NOT NULL,
+				content TEXT NOT NULL,
+				message_type TEXT DEFAULT 'text',
+				file_path TEXT,
+				file_name TEXT,
+				is_read INTEGER DEFAULT 0,
+				mentioned_users TEXT,
+				send_time TEXT NOT NULL DEFAULT(datetime('now')),
+				FOREIGN KEY (group_id) REFERENCES group_chat(id) ON DELETE CASCADE,
+				FOREIGN KEY (from_user_id) REFERENCES user(id) ON DELETE CASCADE
+			)
+			"""
+		)
+
+		conn.execute(
+			"""
+			CREATE TABLE IF NOT EXISTS chat_file(
+				id integer PRIMARY KEY AUTOINCREMENT,
+				file_hash TEXT NOT NULL UNIQUE,
+				file_name TEXT NOT NULL,
+				file_path TEXT NOT NULL,
+				file_size INTEGER NOT NULL,
+				content_type TEXT,
+				uploader_id INTEGER,
+				upload_time TEXT NOT NULL DEFAULT(datetime('now')),
+				FOREIGN KEY (uploader_id) REFERENCES user(id) ON DELETE CASCADE
+			)
+			"""
+		)
+
+		conn.execute(
+			"""
+			CREATE TABLE IF NOT EXISTS chat_server(
+				id integer PRIMARY KEY AUTOINCREMENT,
+				name TEXT NOT NULL,
+				host TEXT NOT NULL,
+				port INTEGER DEFAULT 80,
+				protocol TEXT DEFAULT 'http',
+				is_active INTEGER DEFAULT 1,
+				is_default INTEGER DEFAULT 0,
+				weight INTEGER DEFAULT 1,
+				description TEXT,
+				create_at TEXT NOT NULL DEFAULT(datetime('now')),
+				update_at TEXT NOT NULL DEFAULT(datetime('now'))
+			)
+			"""
+		)
+
+		conn.commit()
+
+def init_default_users():
+	"""初始化默认测试用户"""
+	import hashlib
+	import secrets
+	
+	def hash_password(password: str, salt: bytes) -> str:
+		dk = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt, 100_000)
+		return dk.hex()
+	
+	default_users = [
+		{"username": "Alice", "password": "test123", "role": "user"},
+		{"username": "Bob", "password": "test123", "role": "user"},
+		{"username": "Charlie", "password": "test123", "role": "user"},
+		{"username": "David", "password": "test123", "role": "user"},
+		{"username": "Eve", "password": "test123", "role": "user"},
+	]
+	
+	with get_connection() as conn:
+		for user in default_users:
+			existing = conn.execute("SELECT id FROM user WHERE username = ?", (user["username"],)).fetchone()
+			if not existing:
+				salt = secrets.token_bytes(16)
+				password_hash = hash_password(user["password"], salt)
+				try:
+					conn.execute(
+						"INSERT INTO user(username, password_hash, salt, role) VALUES(?, ?, ?, ?)",
+						(user["username"], password_hash, salt.hex(), user["role"])
+					)
+				except sqlite3.IntegrityError:
+					pass
 		conn.commit()
 
 def init_scout_sources():
@@ -414,3 +566,151 @@ def init_api_interfaces():
 			except sqlite3.IntegrityError:
 				pass
 		conn.commit()
+
+def init_sentiment_samples():
+	"""初始化舆情分析示例数据"""
+	from datetime import datetime, timedelta
+	
+	sample_sentiments = [
+		{
+			"source_type": "scout",
+			"title": "农业科技创新助力乡村振兴",
+			"content": "近年来，我国农业科技创新取得显著进展，人工智能、大数据、物联网等新技术正在深刻改变传统农业生产方式。智慧农业、精准农业等新模式不断涌现，为乡村振兴注入了新动能。",
+			"summary": "农业科技创新推动乡村振兴发展",
+			"sentiment": "positive",
+			"sentiment_score": 0.85,
+			"confidence": 0.92,
+			"keywords": "农业科技,乡村振兴,智慧农业,精准农业",
+			"risk_level": "low",
+			"hot_score": 85.5,
+			"location_name": "北京市",
+			"location_lat": 39.9042,
+			"location_lng": 116.4074,
+			"publish_time": (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d %H:%M:%S")
+		},
+		{
+			"source_type": "scout",
+			"title": "农产品价格波动引发市场关注",
+			"content": "近期部分农产品价格出现较大波动，引起市场广泛关注。专家指出，气候异常、物流成本上升等因素是导致价格波动的主要原因，建议农户做好风险管理。",
+			"summary": "农产品价格波动受多种因素影响",
+			"sentiment": "neutral",
+			"sentiment_score": 0.52,
+			"confidence": 0.88,
+			"keywords": "农产品,价格波动,市场,风险管理",
+			"risk_level": "medium",
+			"hot_score": 72.3,
+			"location_name": "上海市",
+			"location_lat": 31.2304,
+			"location_lng": 121.4737,
+			"publish_time": (datetime.now() - timedelta(hours=12)).strftime("%Y-%m-%d %H:%M:%S")
+		},
+		{
+			"source_type": "scout",
+			"title": "极端天气对农作物造成严重影响",
+			"content": "今年夏季多地遭遇极端高温天气，部分地区农作物受损严重。农业部门已启动应急预案，指导农户采取抗旱措施，尽量减少损失。",
+			"summary": "极端高温天气影响农作物生长",
+			"sentiment": "negative",
+			"sentiment_score": 0.28,
+			"confidence": 0.95,
+			"keywords": "极端天气,高温,农作物,抗旱",
+			"risk_level": "high",
+			"risk_tags": "自然灾害",
+			"hot_score": 92.8,
+			"location_name": "河南省",
+			"location_lat": 34.7466,
+			"location_lng": 113.6253,
+			"publish_time": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+		},
+		{
+			"source_type": "chat",
+			"title": "用户咨询农业贷款政策",
+			"content": "用户询问农业贷款的申请条件和利率政策，客服详细解释了相关政策，并提供了申请流程指引。",
+			"summary": "用户咨询农业贷款政策",
+			"sentiment": "neutral",
+			"sentiment_score": 0.55,
+			"confidence": 0.85,
+			"keywords": "农业贷款,政策,利率,申请",
+			"risk_level": "low",
+			"hot_score": 45.2,
+			"publish_time": (datetime.now() - timedelta(hours=6)).strftime("%Y-%m-%d %H:%M:%S")
+		},
+		{
+			"source_type": "scout",
+			"title": "新型农药研发取得突破",
+			"content": "国内某农业科技公司宣布在新型生物农药研发方面取得重大突破，该农药对环境友好，杀虫效果显著，有望在明年大面积推广应用。",
+			"summary": "新型生物农药研发成功",
+			"sentiment": "positive",
+			"sentiment_score": 0.91,
+			"confidence": 0.94,
+			"keywords": "农药,生物农药,研发,环保",
+			"risk_level": "low",
+			"hot_score": 88.6,
+			"location_name": "广东省",
+			"location_lat": 23.1291,
+			"location_lng": 113.2644,
+			"publish_time": (datetime.now() - timedelta(days=2)).strftime("%Y-%m-%d %H:%M:%S")
+		},
+		{
+			"source_type": "chat",
+			"title": "用户投诉农产品质量问题",
+			"content": "用户反映购买的农产品存在质量问题，要求退换货。客服已受理投诉，并承诺在24小时内给出处理结果。",
+			"summary": "用户投诉农产品质量问题",
+			"sentiment": "negative",
+			"sentiment_score": 0.22,
+			"confidence": 0.89,
+			"keywords": "质量问题,投诉,退换货",
+			"risk_level": "medium",
+			"risk_tags": "质量投诉",
+			"hot_score": 67.5,
+			"publish_time": (datetime.now() - timedelta(hours=3)).strftime("%Y-%m-%d %H:%M:%S")
+		},
+		{
+			"source_type": "scout",
+			"title": "农村电商助力农产品上行",
+			"content": "农村电商平台发展迅速，越来越多的农产品通过网络销售到全国各地。直播带货、短视频推广等新模式让优质农产品走进千家万户。",
+			"summary": "农村电商促进农产品销售",
+			"sentiment": "positive",
+			"sentiment_score": 0.82,
+			"confidence": 0.90,
+			"keywords": "农村电商,直播带货,农产品,销售",
+			"risk_level": "low",
+			"hot_score": 78.9,
+			"location_name": "浙江省",
+			"location_lat": 30.2741,
+			"location_lng": 120.1552,
+			"publish_time": (datetime.now() - timedelta(days=3)).strftime("%Y-%m-%d %H:%M:%S")
+		},
+		{
+			"source_type": "scout",
+			"title": "农业保险政策进一步完善",
+			"content": "国家出台新政策，进一步完善农业保险体系，扩大保险覆盖范围，提高赔付比例，为农户提供更全面的风险保障。",
+			"summary": "农业保险政策完善",
+			"sentiment": "positive",
+			"sentiment_score": 0.88,
+			"confidence": 0.93,
+			"keywords": "农业保险,政策,风险保障",
+			"risk_level": "low",
+			"hot_score": 71.2,
+			"location_name": "四川省",
+			"location_lat": 30.5728,
+			"location_lng": 104.0668,
+			"publish_time": (datetime.now() - timedelta(hours=18)).strftime("%Y-%m-%d %H:%M:%S")
+		}
+	]
+	
+	with get_connection() as conn:
+		count = conn.execute("SELECT COUNT(*) as total FROM sentiment_analysis").fetchone()["total"]
+		if count == 0:
+			for item in sample_sentiments:
+				conn.execute(
+					"""INSERT INTO sentiment_analysis(source_type, title, content, summary, sentiment,
+					   sentiment_score, confidence, keywords, risk_level, risk_tags, hot_score,
+					   location_name, location_lat, location_lng, publish_time)
+					   VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+					(item["source_type"], item["title"], item["content"], item["summary"],
+					 item["sentiment"], item["sentiment_score"], item["confidence"],
+					 item["keywords"], item["risk_level"], item.get("risk_tags"),
+					 item["hot_score"], item.get("location_name"), item.get("location_lat"),
+					 item.get("location_lng"), item["publish_time"])
+				)
+			conn.commit()
